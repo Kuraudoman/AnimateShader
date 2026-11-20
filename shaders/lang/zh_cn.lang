@@ -1,0 +1,146 @@
+# AnimateShader (星穹幻光) — Simplified Chinese Localization
+
+profile.PERFORMANCE=流畅模式
+profile.BALANCED=均衡奇幻 (推荐)
+profile.FANTASY_ULTRA=幻境极致
+profile.comment=快速切换整体画质预设：流畅模式适合集显/轻薄本；均衡奇幻在绚丽二次元光效与帧率间取得最佳平衡；幻境极致开启高精度云层、阴影与反射。
+
+screen.LIGHTING=光照与亮度平衡
+screen.COLOR=色彩表现与调色
+screen.GLOW_EFFECTS=绚丽光效
+screen.SKY_CLOUDS=奇幻天空与云层
+screen.WATER_WORLD=水面与动态世界
+screen.SHADOWS=阴影设置
+
+option.NIGHT_BRIGHTNESS=夜晚亮度
+option.NIGHT_BRIGHTNESS.comment=控制月光与星夜环境照度。默认 1.35 确保夜晚明亮清澈、色彩丰富，绝不漆黑压抑。
+
+option.CAVE_BRIGHTNESS=洞穴/室内保底亮度
+option.CAVE_BRIGHTNESS.comment=控制无光源洞穴与深处室内的基础柔和照度，保持探险清晰度与奇幻氛围。
+
+option.OVERALL_EXPOSURE=整体曝光平衡
+option.OVERALL_EXPOSURE.comment=微调整体画面亮度，白天防过曝、夜晚更通透。
+
+option.ANIME_SHADING_STYLE=二次元明暗风格
+option.ANIME_SHADING_STYLE.comment=选择受光面的明暗过渡风格：柔和奇幻更接近幻想插画，动漫柔阶更具新海诚质感，鲜明赛璐璐拥有利落的动画色块层次。
+value.ANIME_SHADING_STYLE.0=柔和奇幻
+value.ANIME_SHADING_STYLE.1=动漫柔阶
+value.ANIME_SHADING_STYLE.2=鲜明赛璐璐
+
+option.RIM_LIGHT_STRENGTH=二次元轮廓高光
+option.RIM_LIGHT_STRENGTH.comment=为方块边缘与生物轮廓增加动漫逆光金边/月光银边高光。
+
+option.BLOCKLIGHT_STRENGTH=火把与方块光强
+option.BLOCKLIGHT_STRENGTH.comment=调节火把、灯笼、灵魂灯、海晶灯等人工光源的照明亮度。
+
+option.DYNAMIC_HANDLIGHT=动态手持光源
+option.DYNAMIC_HANDLIGHT.comment=主手或副手持火把、灯笼、萤石等发光物品时实时照亮周围环境。
+
+option.SSAO_ENABLED=屏幕空间环境光遮蔽 (SSAO)
+option.SSAO_ENABLED.comment=在方块缝隙与角落添加轻盈的彩色柔影，增强立体层次感。
+
+option.FOLIAGE_SSS=树叶透光散射 (SSS)
+option.FOLIAGE_SSS.comment=树叶、樱花、花草在逆光时呈现通透的翠绿与粉樱透光效果。
+
+option.COLOR_PALETTE=色彩主题预设
+option.COLOR_PALETTE.comment=切换整套光影的二次元奇幻主色调，影响天空、光线、阴影冷暖偏移与氛围色彩。
+value.COLOR_PALETTE.0=新海诚星穹 (蔚蓝琥珀)
+value.COLOR_PALETTE.1=樱花幻境 (粉樱紫霞)
+value.COLOR_PALETTE.2=翠林物语 (吉卜力青翠)
+value.COLOR_PALETTE.3=暮光星海 (梦幻紫青)
+
+option.COLOR_VIBRANCE=色彩鲜艳度
+option.COLOR_VIBRANCE.comment=智能提升自然色与低饱和区域的通透彩度，同时避免高饱和色彩溢出。
+
+option.SHADOW_COLOR_TINT=阴影冷暖偏移
+option.SHADOW_COLOR_TINT.comment=动漫背景美术核心技法：为阴影注入澄澈的天青/薰衣草紫色彩，拒绝死灰脏暗。
+
+option.SUNSET_WARMTH=黄昏霞光浓郁度
+option.SUNSET_WARMTH.comment=增强日出日落时的橙红、玫粉与紫罗兰晚霞色彩张力。
+
+option.TONEMAP_CONTRAST=画面对比度
+option.TONEMAP_CONTRAST.comment=微调动漫电影感色调映射的明暗反差。
+
+option.BLOOM_ENABLED=梦幻柔光辉光 (Bloom)
+option.BLOOM_ENABLED.comment=开启多尺度柔光扩散，让太阳、星月、灯笼、紫水晶与水面高光散发绚丽光晕。
+
+option.BLOOM_INTENSITY=辉光强度
+option.BLOOM_INTENSITY.comment=调节柔光光晕的明亮程度。
+
+option.ANAMORPHIC_STREAK=电影级横向星芒拉丝
+option.ANAMORPHIC_STREAK.comment=为极亮光源（太阳、信标、末地烛、灯笼）叠加细长的动漫电影横向拉丝光斑。
+
+option.GODRAYS_ENABLED=丁达尔体积光束
+option.GODRAYS_ENABLED.comment=开启穿透树冠、山谷与建筑的绚丽阳光/月光射线。
+
+option.GODRAYS_STRENGTH=体积光束强度
+option.GODRAYS_STRENGTH.comment=调节阳光与月光丁达尔光束的显著程度。
+
+option.EMISSIVE_GLOW=自发光方块增强
+option.EMISSIVE_GLOW.comment=提升灯笼、灵魂火、紫水晶、蛙明灯、红石、传送门等方块的彩色自发光耀眼度。
+
+option.SUN_LENS_FLARE=太阳梦幻晕光环
+option.SUN_LENS_FLARE.comment=面向太阳或满月时在视野边缘呈现轻盈的二次元彩虹光晕与星芒。
+
+option.VIGNETTE_STRENGTH=轻柔暗角
+option.VIGNETTE_STRENGTH.comment=在画面四角添加极轻柔的电影感聚焦暗角（设为 0.0 可完全关闭）。
+
+option.ANIME_CLOUDS=新海诚立体云层
+option.ANIME_CLOUDS.comment=渲染带有银边/金边逆光、高光奶油顶与柔紫云底的二次元多层立体积云与卷云。
+
+option.CLOUD_QUALITY=云层精度
+option.CLOUD_QUALITY.comment=调节立体云层的光线步进采样精度。
+value.CLOUD_QUALITY.0=轻快
+value.CLOUD_QUALITY.1=精致
+value.CLOUD_QUALITY.2=极致
+
+option.FANTASY_AURORA=夜空奇幻极光
+option.FANTASY_AURORA.comment=夜晚天空舞动翡翠、青蓝、紫罗兰与樱粉交织的奇幻极光帷幕。
+
+option.AURORA_STRENGTH=极光绚丽度
+option.AURORA_STRENGTH.comment=调节夜空极光的亮度与色彩饱和度。
+
+option.MILKY_WAY=夜空星河与繁星
+option.MILKY_WAY.comment=在夜空绘制横跨天穹的绚丽银河带与多色闪烁星辰。
+
+option.SHOOTING_STARS=夜空流星雨
+option.SHOOTING_STARS.comment=偶发划过星空的流星尾迹，增添浪漫奇幻气息。
+
+option.ATMOSPHERIC_FOG=空气透视柔雾
+option.ATMOSPHERIC_FOG.comment=为远景山峦覆盖柔和的蔚蓝/金霞/薰衣草空气透视薄雾，拉开空间纵深。
+
+option.WATER_SSR=水面屏幕空间反射 (SSR)
+option.WATER_SSR.comment=让水晶水面与冰面实时倒映周围的山川、树木、建筑与灯光。
+
+option.WATER_CAUSTICS=水下光斑焦散
+option.WATER_CAUSTICS.comment=在浅水沙石与海底投射随波纹荡漾的晶莹水光网纹。
+
+option.WATER_SPARKLES=水面动漫星光闪烁
+option.WATER_SPARKLES.comment=在波峰处产生细碎闪耀的日照/月照星芒波光。
+
+option.WATER_CLARITY=水晶水体清澈度
+option.WATER_CLARITY.comment=调节浅水到深水的翡翠青—宝石蓝透光清澈度。
+
+option.WAVING_FOLIAGE=花草树叶随风摇曳
+option.WAVING_FOLIAGE.comment=让树叶、樱花、草丛、花朵与农作物随清风柔和摆动（含同步阴影摆动）。
+
+option.WET_REFLECTIONS=雨天湿润反光
+option.WET_REFLECTIONS.comment=下雨时地面形成水洼高光与润泽反射，雨景依旧明亮动人。
+
+option.shadowMapResolution=阴影分辨率
+option.shadowMapResolution.comment=阴影贴图尺寸。2048 兼顾清晰度与流畅度，3072/4096 阴影更锐利。
+
+option.shadowDistance=阴影距离
+option.shadowDistance.comment=实时阴影覆盖的最大半径（方块数）。
+
+option.SHADOW_QUALITY=柔影采样质量
+option.SHADOW_QUALITY.comment=控制阴影边缘柔和滤波采样次数。
+value.SHADOW_QUALITY.0=快速
+value.SHADOW_QUALITY.1=柔和
+value.SHADOW_QUALITY.2=细腻
+
+option.COLORED_SHADOWS=彩色玻璃透射光影
+option.COLORED_SHADOWS.comment=阳光穿过染色玻璃时在地面投射出绚丽的彩色光斑。
+
+option.NIGHT_SHADOWS=月光柔和阴影
+option.NIGHT_SHADOWS.comment=夜晚保留柔美梦幻的月光投射阴影（阴影仍带明亮紫蓝补光，不会漆黑）。

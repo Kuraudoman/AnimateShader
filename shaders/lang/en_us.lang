@@ -1,0 +1,146 @@
+# AnimateShader — English Localization
+
+profile.PERFORMANCE=Performance
+profile.BALANCED=Balanced Fantasy (Recommended)
+profile.FANTASY_ULTRA=Fantasy Ultra
+profile.comment=Quick quality presets: Performance for lightweight GPUs; Balanced Fantasy for rich anime visuals & smooth FPS; Fantasy Ultra for maximum cloud, shadow, and reflection fidelity.
+
+screen.LIGHTING=Lighting & Brightness Balance
+screen.COLOR=Color Expression & Grading
+screen.GLOW_EFFECTS=Dazzling Effects & Bloom
+screen.SKY_CLOUDS=Fantasy Sky & Clouds
+screen.WATER_WORLD=Water & Living World
+screen.SHADOWS=Shadows
+
+option.NIGHT_BRIGHTNESS=Night Brightness
+option.NIGHT_BRIGHTNESS.comment=Controls moonlight and starry night ambient brightness. Default 1.35 keeps nights luminous, vivid, and never pitch black.
+
+option.CAVE_BRIGHTNESS=Cave / Indoor Floor
+option.CAVE_BRIGHTNESS.comment=Controls minimum ambient visibility inside unlit caves and interiors while preserving magical depth.
+
+option.OVERALL_EXPOSURE=Overall Exposure Balance
+option.OVERALL_EXPOSURE.comment=Fine-tunes overall brightness balance between noon highlights and cozy nights.
+
+option.ANIME_SHADING_STYLE=Anime Shading Style
+option.ANIME_SHADING_STYLE.comment=Choose diffuse ramp style: Smooth Fantasy for painterly illustration, Soft Anime Cel for Makoto Shinkai feel, Crisp Cel for bold anime bands.
+value.ANIME_SHADING_STYLE.0=Smooth Fantasy
+value.ANIME_SHADING_STYLE.1=Soft Anime Cel
+value.ANIME_SHADING_STYLE.2=Crisp Anime Cel
+
+option.RIM_LIGHT_STRENGTH=Anime Rim Highlight
+option.RIM_LIGHT_STRENGTH.comment=Adds luminous golden sun-rim and silver-cyan moon-rim highlights to edges and entities.
+
+option.BLOCKLIGHT_STRENGTH=Block Light Strength
+option.BLOCKLIGHT_STRENGTH.comment=Adjusts illumination from torches, lanterns, soul lights, sea lanterns, and emissive blocks.
+
+option.DYNAMIC_HANDLIGHT=Dynamic Handheld Light
+option.DYNAMIC_HANDLIGHT.comment=Lights up nearby blocks smoothly when holding glowing items in either main hand or off-hand.
+
+option.SSAO_ENABLED=Screen-Space AO (SSAO)
+option.SSAO_ENABLED.comment=Adds subtle color-tinted contact shading in block crevices for painterly depth.
+
+option.FOLIAGE_SSS=Foliage Subsurface Scattering
+option.FOLIAGE_SSS.comment=Makes leaves, cherry blossoms, grass, and flowers glow translucently when backlit.
+
+option.COLOR_PALETTE=Color Theme Palette
+option.COLOR_PALETTE.comment=Selects the signature anime fantasy color palette for sky, sunlight, shadows, and atmosphere.
+value.COLOR_PALETTE.0=Shinkai Azure
+value.COLOR_PALETTE.1=Sakura Fantasy
+value.COLOR_PALETTE.2=Emerald Ghibli
+value.COLOR_PALETTE.3=Ethereal Violet
+
+option.COLOR_VIBRANCE=Color Vibrance
+option.COLOR_VIBRANCE.comment=Boosts natural color richness selectively without clipping already saturated hues.
+
+option.SHADOW_COLOR_TINT=Shadow Hue Shift
+option.SHADOW_COLOR_TINT.comment=Classic anime background art technique: tints shadows with luminous cerulean and lavender instead of muddy grey.
+
+option.SUNSET_WARMTH=Sunset Richness
+option.SUNSET_WARMTH.comment=Enhances vibrant tangerine, rose-magenta, and violet twilight hues during golden hour.
+
+option.TONEMAP_CONTRAST=Tone Map Contrast
+option.TONEMAP_CONTRAST.comment=Fine-tunes the anime filmic contrast curve.
+
+option.BLOOM_ENABLED=Dreamy HDR Bloom
+option.BLOOM_ENABLED.comment=Multi-scale silky HDR bloom for sun, moon, lanterns, crystals, portals, and water glints.
+
+option.BLOOM_INTENSITY=Bloom Intensity
+option.BLOOM_INTENSITY.comment=Controls the radiance of HDR bloom halos.
+
+option.ANAMORPHIC_STREAK=Anamorphic Light Streaks
+option.ANAMORPHIC_STREAK.comment=Adds cinematic horizontal anime light streaks to intense highlights and emissives.
+
+option.GODRAYS_ENABLED=Volumetric Godrays
+option.GODRAYS_ENABLED.comment=Renders luminous crepuscular sunbeams and moonbeams streaming past terrain and trees.
+
+option.GODRAYS_STRENGTH=Godray Intensity
+option.GODRAYS_STRENGTH.comment=Adjusts visibility of volumetric light shafts.
+
+option.EMISSIVE_GLOW=Emissive Block Radiance
+option.EMISSIVE_GLOW.comment=Enhances colorful glow on lanterns, soul fire, amethyst, froglights, redstone, and portals.
+
+option.SUN_LENS_FLARE=Sun / Moon Halo Flare
+option.SUN_LENS_FLARE.comment=Renders delicate anime bokeh rings and starburst flares when glancing near the sun or moon.
+
+option.VIGNETTE_STRENGTH=Soft Vignette
+option.VIGNETTE_STRENGTH.comment=Subtle atmospheric edge framing (set to 0.0 to disable).
+
+option.ANIME_CLOUDS=Painterly Anime Clouds
+option.ANIME_CLOUDS.comment=Layered volumetric cumulus and cirrus clouds with backlit silver-gold edges and pastel undersides.
+
+option.CLOUD_QUALITY=Cloud Quality
+option.CLOUD_QUALITY.comment=Adjusts raymarching step quality for volumetric anime clouds.
+value.CLOUD_QUALITY.0=Fast
+value.CLOUD_QUALITY.1=Detailed
+value.CLOUD_QUALITY.2=Ultra
+
+option.FANTASY_AURORA=Fantasy Night Aurora
+option.FANTASY_AURORA.comment=Shimmering emerald, cyan, violet, and sakura-pink aurora ribbons dancing across the night sky.
+
+option.AURORA_STRENGTH=Aurora Vibrance
+option.AURORA_STRENGTH.comment=Adjusts brightness and richness of the fantasy night aurora.
+
+option.MILKY_WAY=Milky Way & Starfield
+option.MILKY_WAY.comment=Luminous cosmic Milky Way band and twinkling multi-colored stars at night.
+
+option.SHOOTING_STARS=Shooting Stars
+option.SHOOTING_STARS.comment=Occasional glowing meteors streaking gracefully across the starry sky.
+
+option.ATMOSPHERIC_FOG=Aerial Perspective Mist
+option.ATMOSPHERIC_FOG.comment=Soft sky-matched pastel distance haze for dreamy depth and scale.
+
+option.WATER_SSR=Water Screen-Space Reflections
+option.WATER_SSR.comment=Real-time reflections of mountains, trees, builds, and glowing lights on water and ice.
+
+option.WATER_CAUSTICS=Underwater Caustics
+option.WATER_CAUSTICS.comment=Animated sparkling sun/moon caustic patterns projected onto submerged surfaces.
+
+option.WATER_SPARKLES=Anime Water Sparkles
+option.WATER_SPARKLES.comment=Twinkling star-like specular glints dancing on sunlit and moonlit wave crests.
+
+option.WATER_CLARITY=Crystal Water Clarity
+option.WATER_CLARITY.comment=Adjusts shallow aquamarine to deep sapphire water transparency.
+
+option.WAVING_FOLIAGE=Waving Foliage
+option.WAVING_FOLIAGE.comment=Gentle wind sway on leaves, cherry blossoms, grass, flowers, and crops (synced with shadows).
+
+option.WET_REFLECTIONS=Wet Rain Reflections
+option.WET_REFLECTIONS.comment=Adds luminous wet specular sheen and puddles during rain without darkening the world.
+
+option.shadowMapResolution=Shadow Resolution
+option.shadowMapResolution.comment=Shadow map texture resolution. 2048 balances sharpness and performance.
+
+option.shadowDistance=Shadow Distance
+option.shadowDistance.comment=Maximum real-time shadow rendering radius in blocks.
+
+option.SHADOW_QUALITY=Soft Shadow Quality
+option.SHADOW_QUALITY.comment=Controls Vogel-disk PCF shadow filtering sample count.
+value.SHADOW_QUALITY.0=Fast
+value.SHADOW_QUALITY.1=Soft
+value.SHADOW_QUALITY.2=Smooth
+
+option.COLORED_SHADOWS=Colored Stained-Glass Shadows
+option.COLORED_SHADOWS.comment=Projects vibrant colored light onto floors and walls when sunlight shines through stained glass.
+
+option.NIGHT_SHADOWS=Soft Moonlight Shadows
+option.NIGHT_SHADOWS.comment=Enables gentle moonlight shadows at night while keeping shadowed areas bright and colorful.
