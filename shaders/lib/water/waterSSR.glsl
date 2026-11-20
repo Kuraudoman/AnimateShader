@@ -20,7 +20,8 @@ vec4 traceAnimeSSR(
     sampler2D depthOpaqueTex,
     mat4 proj,
     mat4 projInv,
-    mat4 modelViewInv
+    mat4 modelViewInv,
+    bool rejectBelowSurface
 ) {
 #ifndef WATER_SSR
     return vec4(0.0);
@@ -28,17 +29,17 @@ vec4 traceAnimeSSR(
     vec3 viewDir = safeNormalize(viewPos);
     vec3 nView   = safeNormalize(viewNormal);
 
-    // Compute reflection direction in world space and clamp upward so wave troughs
+    // Compute reflection direction in world space and clamp upward on water so wave troughs
     // never reflect downward into the underwater seabed!
     vec3 worldViewDir = safeNormalize((modelViewInv * vec4(viewDir, 0.0)).xyz);
     vec3 worldNorm    = safeNormalize((modelViewInv * vec4(nView, 0.0)).xyz);
     vec3 worldRefl    = reflect(worldViewDir, worldNorm);
-    if (worldRefl.y < 0.005) {
+    if (rejectBelowSurface && worldRefl.y < 0.005) {
         worldRefl.y = abs(worldRefl.y) * 0.35 + 0.005;
         worldRefl = safeNormalize(worldRefl);
     }
 
-    // Transform clamped reflection back to view space via transpose of upper-left 3x3
+    // Transform reflection back to view space via transpose of upper-left 3x3
     // (gbufferModelViewInverse is rigid rotation, so transpose == inverse)
     vec3 reflDir = safeNormalize(transpose(mat3(modelViewInv)) * worldRefl);
 
@@ -78,7 +79,6 @@ vec4 traceAnimeSSR(
 
     // Mild dither (0.25 step) prevents banding without creating noisy missing-pixel holes
     float prevT = 0.0;
-    float prevRayLinZ = -startView.z;
     bool hit = false;
     vec2 hitUV = vec2(0.0);
 
@@ -103,10 +103,12 @@ vec4 traceAnimeSSR(
 
         // CRITICAL ABOVE-WATER CHECK #1:
         // Above-water opaque terrain has depthtex0 == depthtex1; underwater seabed has depthtex0 < depthtex1!
-        float allDepth = texture(depthAllTex, curScr.xy).r;
-        if (opaqueDepth - allDepth > 1e-6) {
-            prevT = t;
-            continue;
+        if (rejectBelowSurface) {
+            float allDepth = texture(depthAllTex, curScr.xy).r;
+            if (opaqueDepth - allDepth > 1e-6) {
+                prevT = t;
+                continue;
+            }
         }
 
         if (curScr.z > opaqueDepth) {
@@ -115,19 +117,22 @@ vec4 traceAnimeSSR(
 
             // CRITICAL ABOVE-WATER CHECK #2:
             // Never reflect geometry physically below the water surface plane!
-            vec3 scenePlayerPos = (modelViewInv * vec4(sceneView, 1.0)).xyz;
-            if (scenePlayerPos.y < waterPlayerPos.y - 0.08) {
-                prevRayLinZ = -rayView.z;
-                prevT = t;
-                continue;
+            if (rejectBelowSurface) {
+                vec3 scenePlayerPos = (modelViewInv * vec4(sceneView, 1.0)).xyz;
+                if (scenePlayerPos.y < waterPlayerPos.y - 0.08) {
+                    prevT = t;
+                    continue;
+                }
             }
 
             float rayDistZ   = -rayView.z;
             float sceneDistZ = -sceneView.z;
             float depthDiff  = rayDistZ - sceneDistZ;
 
-            // Generous, distance-scaled thickness tolerance prevents holes on steep cliffs & mountains
-            float stepZ = max(abs(rayDistZ - prevRayLinZ), 0.6);
+            // Compute exact step depth delta from prevT -> t (never stale across skipped steps)
+            vec3 prevScr  = startScr + rayDelta * prevT;
+            vec3 prevView = screenToView(clamp(prevScr.xy, vec2(0.001), vec2(0.999)), clamp(prevScr.z, 0.0001, 0.9998), projInv);
+            float stepZ   = max(abs(rayDistZ - (-prevView.z)), 0.6);
             float maxThickness = clamp(stepZ * 3.8 + sceneDistZ * 0.16, 3.0, 48.0);
 
             if (depthDiff >= 0.0 && depthDiff < maxThickness) {
@@ -139,9 +144,12 @@ vec4 traceAnimeSSR(
                     vec3 mScr = startScr + rayDelta * mid;
                     vec2 mUV  = clamp(mScr.xy, vec2(0.001), vec2(0.999));
                     float mDepth = texture(depthOpaqueTex, mUV).r;
-                    float mAll   = texture(depthAllTex,    mUV).r;
-                    bool mAboveWater = (mDepth - mAll <= 1e-6);
-                    if (mAboveWater && mDepth < 0.9998 && mScr.z > mDepth) {
+                    bool mValid = (mDepth < 0.9998);
+                    if (mValid && rejectBelowSurface) {
+                        float mAll = texture(depthAllTex, mUV).r;
+                        mValid = (mDepth - mAll <= 1e-6);
+                    }
+                    if (mValid && mScr.z > mDepth) {
                         hi = mid;
                     } else {
                         lo = mid;
@@ -151,11 +159,19 @@ vec4 traceAnimeSSR(
                 vec3 finalScr = startScr + rayDelta * hi;
                 vec2 finalUV  = clamp(finalScr.xy, vec2(0.001), vec2(0.999));
                 float fOpaque = texture(depthOpaqueTex, finalUV).r;
-                float fAll    = texture(depthAllTex,    finalUV).r;
-                if (fOpaque < 0.9998 && (fOpaque - fAll <= 1e-6)) {
-                    vec3 fView = screenToView(finalUV, fOpaque, projInv);
-                    vec3 fPlayer = (modelViewInv * vec4(fView, 1.0)).xyz;
-                    if (fPlayer.y >= waterPlayerPos.y - 0.08) {
+                bool fValid = (fOpaque < 0.9998);
+                if (fValid && rejectBelowSurface) {
+                    float fAll = texture(depthAllTex, finalUV).r;
+                    fValid = (fOpaque - fAll <= 1e-6);
+                }
+                if (fValid) {
+                    bool heightOk = true;
+                    if (rejectBelowSurface) {
+                        vec3 fView = screenToView(finalUV, fOpaque, projInv);
+                        vec3 fPlayer = (modelViewInv * vec4(fView, 1.0)).xyz;
+                        heightOk = (fPlayer.y >= waterPlayerPos.y - 0.08);
+                    }
+                    if (heightOk) {
                         hitUV = finalUV;
                         hit = true;
                         break;
@@ -164,8 +180,6 @@ vec4 traceAnimeSSR(
             }
         }
 
-        vec3 curView = screenToView(curScr.xy, curScr.z, projInv);
-        prevRayLinZ = -curView.z;
         prevT = t;
     }
 

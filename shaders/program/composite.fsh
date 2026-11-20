@@ -10,6 +10,7 @@
 #include "/lib/common/math.glsl"
 #include "/lib/common/timeAndPalette.glsl"
 #include "/lib/atmosphere/fog.glsl"
+#include "/lib/water/waterWaves.glsl"
 #include "/lib/water/waterSSR.glsl"
 #include "/lib/post/godrays.glsl"
 
@@ -22,12 +23,15 @@ uniform sampler2D depthtex1; // Opaque depth (for godrays & underwater thickness
 
 uniform mat4 gbufferProjection;
 uniform mat4 gbufferProjectionInverse;
+uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
 
 uniform vec3 sunPosition;
 uniform vec3 moonPosition;
+uniform vec3 cameraPosition;
 uniform vec3 endFlashPosition;
 uniform float endFlashIntensity;
+uniform float frameTimeCounter;
 uniform float far;
 uniform float aspectRatio;
 uniform float rainStrength;
@@ -70,50 +74,59 @@ void main() {
         vec3 worldDir = safeNormalize((gbufferModelViewInverse * vec4(viewDir, 0.0)).xyz);
 
         // --- 1. Water & Ice Real-Time Screen-Space Reflections (SSR) ---
-        if (ssrMask.x > 0.05) {
-            vec3 waterViewNormal = safeNormalize(normMat.xyz);
+        if (ssrMask.x > 0.05 && isEyeInWater == 0) {
+            bool isWaterSSR = (ssrMask.x > 0.65);
+            vec3 reflViewNormal;
+            if (ssrMask.x > 0.85) {
+                // Recompute flat water wave normal analytically from worldPos for 100% immunity
+                // against any G-buffer normal blending or underwater block leakage!
+                vec3 worldPos  = playerPos + cameraPosition;
+                vec3 waveWNorm = computeWaterWorldNormal(worldPos, vec3(0.0, 1.0, 0.0), viewDist, frameTimeCounter, rainStrength);
+                vec3 upVNorm   = safeNormalize(mat3(gbufferModelView) * vec3(0.0, 1.0, 0.0));
+                vec3 waveVNorm = safeNormalize(mat3(gbufferModelView) * waveWNorm);
+                reflViewNormal = safeNormalize(mix(upVNorm, waveVNorm, 0.55));
+            } else {
+                reflViewNormal = safeNormalize(normMat.xyz);
+            }
+
             vec4 ssr = traceAnimeSSR(
                 viewPos,
-                waterViewNormal,
+                reflViewNormal,
                 dither,
                 colortex4,
                 depthtex0,
                 depthtex1,
                 gbufferProjection,
                 gbufferProjectionInverse,
-                gbufferModelViewInverse
+                gbufferModelViewInverse,
+                isWaterSSR
             );
-            float reflBlend = clamp(ssr.a * ssrMask.x * ssrMask.y * ssrMask.z * 0.82, 0.0, 0.78);
+            float maskStrength = isWaterSSR ? 1.0 : ssrMask.x;
+            float reflBlend = clamp(ssr.a * maskStrength * ssrMask.y * ssrMask.z * 0.82, 0.0, 0.78);
             color = mix(color, ssr.rgb, reflBlend);
         }
 
-        // --- 2. Pastel Anime Aerial Perspective & Underwater Crystal Fog ---
-        color = applyAnimeFog(
-            color,
-            playerPos,
-            worldDir,
-            viewDist,
-            far,
-            st,
-            isEyeInWater,
-            blindness,
-            darknessFactor
-        );
+        // --- 2. Pastel Anime Aerial Perspective & Status Fog ---
+        // Note: When submerged (isEyeInWater > 0), medium fog is applied accurately per depth layer
+        // in deferred.fsh + gbuffers_water.fsh + particles so underwater ice never X-rays!
+        if (isEyeInWater == 0) {
+            color = applyAnimeFog(
+                color,
+                playerPos,
+                worldDir,
+                viewDist,
+                far,
+                st,
+                isEyeInWater,
+                blindness,
+                darknessFactor
+            );
+        } else {
+            color = applyStatusFog(color, viewDist, blindness, darknessFactor);
+        }
     } else if (isSky && isEyeInWater > 0) {
-        // Tint distant sky smoothly when submerged underwater / lava / powder snow
-        vec3 viewPosFar = screenToView(vTexCoord, 1.0, gbufferProjectionInverse);
-        vec3 worldDir = safeNormalize((gbufferModelViewInverse * vec4(viewPosFar, 0.0)).xyz);
-        color = applyAnimeFog(
-            color,
-            worldDir * far,
-            worldDir,
-            far * 0.65,
-            far,
-            st,
-            isEyeInWater,
-            blindness,
-            darknessFactor
-        );
+        // Medium fog on sky was already applied in deferred.fsh; only apply status fog here
+        color = applyStatusFog(color, far * 0.65, blindness, darknessFactor);
     }
 
     // --- 3. Volumetric Crepuscular Godrays (Sunbeams & Moonbeams) + Halo Flare ---

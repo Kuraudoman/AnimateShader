@@ -299,6 +299,13 @@ def check_settings_and_properties() -> list:
             for tok in rhs.split():
                 if tok not in defined_opts:
                     errors.append(f"shaders.properties:{idx}: unknown slider option '{tok}'")
+        elif s.startswith("blend."):
+            lhs = s.split("=", 1)[0]
+            if "/" in lhs:
+                errors.append(
+                    f"shaders.properties:{idx}: '{lhs}' must NOT include a dimension prefix (e.g. world0/); "
+                    f"Iris ProgramDirectives matches blend overrides by bare program name!"
+                )
         elif s.startswith("profile."):
             rhs = s.split("=", 1)[1]
             for tok in rhs.split():
@@ -307,6 +314,7 @@ def check_settings_and_properties() -> list:
                 opt = tok.lstrip("!").split("=")[0].split(":")[0]
                 if opt not in defined_opts:
                     errors.append(f"shaders.properties:{idx}: unknown profile option '{opt}'")
+
 
     # Check lang files cover all options
     for lang_name in ("zh_cn.lang", "en_us.lang"):

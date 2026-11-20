@@ -10,6 +10,26 @@
 // Crisp foreground clarity with dreamy pastel depth separation at long range.
 // ==============================================================================
 
+vec3 computeUnderwaterFogColor(vec3 worldDir, AnimeLightingState st) {
+    vec3 uwDay   = vec3(0.04, 0.34, 0.54);
+    vec3 uwNight = vec3(0.025, 0.11, 0.24) * max(NIGHT_BRIGHTNESS, 1.0);
+    vec3 uwCol   = mix(uwNight, uwDay, st.dayFactor);
+    uwCol += vec3(0.06, 0.24, 0.32) * smoothstep(-0.1, 0.8, worldDir.y) * (0.4 + 0.6 * st.dayFactor);
+    return uwCol;
+}
+
+vec3 applyStatusFog(vec3 color, float viewDist, float blindnessVal, float darknessVal) {
+    if (blindnessVal > 0.001) {
+        float blindAmt = clamp(smoothstep(2.0, 12.0, viewDist) * blindnessVal, 0.0, 0.96);
+        color = mix(color, vec3(0.01, 0.01, 0.02), blindAmt);
+    }
+    if (darknessVal > 0.001) {
+        float darkAmt = clamp(smoothstep(4.0, 22.0, viewDist) * darknessVal * 0.85, 0.0, 0.90);
+        color = mix(color, vec3(0.015, 0.02, 0.035), darkAmt);
+    }
+    return color;
+}
+
 vec3 applyAnimeFog(
     vec3 color,
     vec3 worldPosRel,
@@ -24,17 +44,17 @@ vec3 applyAnimeFog(
     if (eyeInWater == 1) {
         float clarityScale = 0.022 / max(WATER_CLARITY, 0.4);
         float uwFog = 1.0 - exp(-viewDist * clarityScale);
-        vec3 uwDay   = vec3(0.04, 0.34, 0.54);
-        vec3 uwNight = vec3(0.025, 0.11, 0.24) * max(NIGHT_BRIGHTNESS, 1.0);
-        vec3 uwCol   = mix(uwNight, uwDay, st.dayFactor);
-        uwCol += vec3(0.06, 0.24, 0.32) * smoothstep(-0.1, 0.8, worldDir.y) * (0.4 + 0.6 * st.dayFactor);
-        return mix(color, uwCol, clamp(uwFog, 0.0, 0.88));
+        vec3 uwCol = computeUnderwaterFogColor(worldDir, st);
+        color = mix(color, uwCol, clamp(uwFog, 0.0, 0.94));
+        return applyStatusFog(color, viewDist, blindnessVal, darknessVal);
     } else if (eyeInWater == 2) {
         float lavaFog = 1.0 - exp(-viewDist * 0.45);
-        return mix(color, vec3(0.95, 0.24, 0.06), clamp(lavaFog, 0.0, 0.96));
+        color = mix(color, vec3(0.95, 0.24, 0.06), clamp(lavaFog, 0.0, 0.96));
+        return applyStatusFog(color, viewDist, blindnessVal, darknessVal);
     } else if (eyeInWater == 3) {
         float snowFog = 1.0 - exp(-viewDist * 0.35);
-        return mix(color, vec3(0.58, 0.72, 0.88), clamp(snowFog, 0.0, 0.95));
+        color = mix(color, vec3(0.58, 0.72, 0.88), clamp(snowFog, 0.0, 0.95));
+        return applyStatusFog(color, viewDist, blindnessVal, darknessVal);
     }
 
     float fogMult = ATMOSPHERIC_FOG;
@@ -67,16 +87,8 @@ vec3 applyAnimeFog(
 #endif
     }
 
-    if (blindnessVal > 0.001) {
-        float blindAmt = clamp(smoothstep(2.0, 12.0, viewDist) * blindnessVal, 0.0, 0.96);
-        color = mix(color, vec3(0.01, 0.01, 0.02), blindAmt);
-    }
-    if (darknessVal > 0.001) {
-        float darkAmt = clamp(smoothstep(4.0, 22.0, viewDist) * darknessVal * 0.85, 0.0, 0.90);
-        color = mix(color, vec3(0.015, 0.02, 0.035), darkAmt);
-    }
-
-    return color;
+    return applyStatusFog(color, viewDist, blindnessVal, darknessVal);
 }
 
 #endif
+

@@ -14,6 +14,7 @@
 #include "/lib/common/timeAndPalette.glsl"
 #include "/lib/atmosphere/sky.glsl"
 #include "/lib/atmosphere/clouds.glsl"
+#include "/lib/atmosphere/fog.glsl"
 #include "/lib/lighting/shadows.glsl"
 #include "/lib/lighting/caustics.glsl"
 #include "/lib/lighting/shading.glsl"
@@ -40,6 +41,7 @@ uniform vec3 sunPosition;
 uniform vec3 moonPosition;
 uniform vec3 shadowLightPosition;
 uniform vec3 cameraPosition;
+uniform float far;
 uniform float frameTimeCounter;
 uniform float rainStrength;
 uniform float wetness;
@@ -93,8 +95,24 @@ void main() {
         vec4 clouds = renderAnimeClouds(worldDir, cameraPosition, st, frameTimeCounter, dither);
         skyCol = skyCol * (1.0 - clouds.a) + clouds.rgb;
 
+        // When submerged, apply medium fog before translucents (ice/glass/water) draw
+        // so distant sky behind underwater ice never X-rays through!
+        if (isEyeInWater > 0) {
+            skyCol = applyAnimeFog(
+                skyCol,
+                worldDir * far,
+                worldDir,
+                far * 0.65,
+                far,
+                st,
+                isEyeInWater,
+                0.0,
+                0.0
+            );
+        }
+
         sceneColorOut = vec4(skyCol, 1.0);
-        resetAuxOut   = vec4(0.0);
+        resetAuxOut   = vec4(0.0, 0.0, 0.0, 1.0);
         opaqueCopyOut = vec4(skyCol, 1.0);
         return;
     }
@@ -211,7 +229,24 @@ void main() {
     // Add glowing enchantment glint, mob eyes, and beacon energy from colortex3
     litColor += additiveGlow;
 
+    // Apply accurate distance-based underwater/lava/snow fog to opaque terrain BEFORE
+    // translucents (ice/glass/water) draw so distant mountains never X-ray through ice!
+    if (isEyeInWater > 0 && !isHand) {
+        litColor = applyAnimeFog(
+            litColor,
+            feetPlayerPos,
+            worldViewDir,
+            viewDist,
+            far,
+            st,
+            isEyeInWater,
+            0.0,
+            0.0
+        );
+    }
+
     sceneColorOut = vec4(litColor, 1.0);
-    resetAuxOut   = vec4(0.0);
+    resetAuxOut   = vec4(0.0, 0.0, 0.0, 1.0);
     opaqueCopyOut = vec4(litColor, 1.0);
 }
+
