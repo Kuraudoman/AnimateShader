@@ -51,12 +51,11 @@ vec3 computeFoliageWaveOffset(vec3 worldPos, int blockId, vec2 texCoord, vec2 mi
     return vec3(0.0);
 }
 
-// Gentle vertical ripple on water surfaces
+// Gentle vertical ripple on water surfaces (kept subtle so shallow 1-block beds never clip)
 float computeWaterVertexWave(vec3 worldPos, float timeSec) {
-    float w1 = sin(worldPos.x * 1.15 + worldPos.z * 0.75 + timeSec * 1.85) * 0.026;
-    float w2 = cos(worldPos.x * 0.85 - worldPos.z * 1.35 + timeSec * 1.45) * 0.020;
-    float w3 = sin((worldPos.x + worldPos.z) * 2.1 - timeSec * 2.4) * 0.010;
-    return w1 + w2 + w3;
+    float w1 = sin(worldPos.x * 1.05 + worldPos.z * 0.70 + timeSec * 1.55) * 0.014;
+    float w2 = cos(worldPos.x * 0.80 - worldPos.z * 1.25 + timeSec * 1.25) * 0.010;
+    return w1 + w2;
 }
 
 #endif

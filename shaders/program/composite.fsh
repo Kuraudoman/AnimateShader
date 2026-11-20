@@ -77,11 +77,13 @@ void main() {
                 waterViewNormal,
                 dither,
                 colortex4,
+                depthtex0,
                 depthtex1,
                 gbufferProjection,
-                gbufferProjectionInverse
+                gbufferProjectionInverse,
+                gbufferModelViewInverse
             );
-            float reflBlend = clamp(ssr.a * ssrMask.x * ssrMask.y * ssrMask.z * 0.92, 0.0, 0.88);
+            float reflBlend = clamp(ssr.a * ssrMask.x * ssrMask.y * ssrMask.z * 0.82, 0.0, 0.78);
             color = mix(color, ssr.rgb, reflBlend);
         }
 

@@ -81,13 +81,18 @@ void main() {
     // =========================================================================
     if (vBlockId == 10001) {
         vec3 baseWNorm = safeNormalize(vWorldNormal);
-        vec3 waveWNorm = computeWaterWorldNormal(vWorldPos, baseWNorm, frameTimeCounter, rainStrength);
+        vec3 baseVNorm = safeNormalize(vViewNormal);
+        bool isTopWater = (baseWNorm.y > 0.5);
+
+        vec3 waveWNorm = computeWaterWorldNormal(vWorldPos, baseWNorm, viewDist, frameTimeCounter, rainStrength);
         vec3 waveVNorm = safeNormalize(mat3(gbufferModelView) * waveWNorm);
+        // Smoother reflection normal keeps mountain/tree SSR glassy and continuous
+        vec3 ssrVNorm  = safeNormalize(mix(baseVNorm, waveVNorm, 0.55));
 
         // Compute true geometric water column thickness along the view ray
         float bgDepth = texture(depthtex1, screenUV).r;
-        float waterThickness = 24.0;
-        vec3 bgWorldPos = vWorldPos + worldViewDir * 24.0;
+        float waterThickness = 20.0;
+        vec3 bgWorldPos = vWorldPos + worldViewDir * 20.0;
         if (bgDepth < 0.9998) {
             vec3 bgViewPos = screenToView(screenUV, bgDepth, gbufferProjectionInverse);
             waterThickness = max(length(bgViewPos - vViewPos), 0.0);
@@ -95,16 +100,23 @@ void main() {
             bgWorldPos = bgPlayer + cameraPosition;
         }
 
-        // Gentle depth-scaled screen refraction with foreground occluder safety check
-        float refractStrength = 0.018 * smoothstep(0.0, 1.5, waterThickness) / (1.0 + viewDist * 0.045);
-        vec2 refractOffset = (waveVNorm.xy - vViewNormal.xy) * refractStrength;
+        // Gentle, clean refraction for underwater blocks (never bleeds foreground or above-water cliffs!)
+        float refractStrength = 0.010 * smoothstep(0.0, 1.8, waterThickness) / (1.0 + viewDist * 0.075);
+        vec2 refractOffset = (waveVNorm.xy - baseVNorm.xy) * refractStrength;
         vec2 refractUV = clamp(screenUV + refractOffset, vec2(0.002), vec2(0.998));
 
-        // Prevent foreground solid blocks from bleeding into water refraction
         float refrDepth = texture(depthtex1, refractUV).r;
-        if (refrDepth <= gl_FragCoord.z + 0.00002) {
+        if (refrDepth <= gl_FragCoord.z + 0.00005 || refrDepth >= 0.9998) {
             refractUV = screenUV;
             refrDepth = bgDepth;
+        } else {
+            // Reject refracted samples that belong to above-water shore/cliffs behind the water
+            vec3 refrViewPos = screenToView(refractUV, refrDepth, gbufferProjectionInverse);
+            vec3 refrWorldPos = (gbufferModelViewInverse * vec4(refrViewPos, 1.0)).xyz + cameraPosition;
+            if (refrWorldPos.y > vWorldPos.y + 0.05) {
+                refractUV = screenUV;
+                refrDepth = bgDepth;
+            }
         }
 
         vec3 refractedScene = texture(colortex4, refractUV).rgb;
@@ -112,36 +124,36 @@ void main() {
         // Project crystalline underwater caustics onto submerged terrain seen through water!
         if (isEyeInWater == 0 && refrDepth < 0.9998 && waterThickness < 18.0) {
             float caust = computeUnderwaterCaustics(bgWorldPos, st.activeLightDir, frameTimeCounter);
-            float caustAtten = exp(-waterThickness * 0.22) * smoothstep(0.15, 0.85, lm.y);
+            float caustAtten = exp(-waterThickness * 0.20) * smoothstep(0.15, 0.85, lm.y);
             vec3 caustTint = mix(vec3(0.32, 0.86, 1.18), vec3(0.58, 1.12, 1.24), st.dayFactor);
-            refractedScene += caustTint * caust * caustAtten * 0.36;
+            refractedScene += caustTint * caust * caustAtten * 0.34;
         }
 
-        // Biome tint blended gently with our crystal anime aquamarine -> sapphire palette
+        // Biome tint blended gently with crystal anime aquamarine -> sapphire palette
         vec3 biomeLinear = srgbToLinear(clamp(vColor.rgb, vec3(0.08), vec3(1.0)));
-        vec3 shallowTint = mix(vec3(0.08, 0.56, 0.66), biomeLinear * vec3(0.45, 1.05, 1.08), 0.36);
-        vec3 deepTint    = mix(vec3(0.014, 0.085, 0.24), vec3(0.024, 0.16, 0.42), st.dayFactor);
+        vec3 shallowTint = mix(vec3(0.10, 0.62, 0.72), biomeLinear * vec3(0.48, 1.08, 1.10), 0.36);
+        vec3 deepTint    = mix(vec3(0.016, 0.095, 0.26), vec3(0.026, 0.17, 0.44), st.dayFactor);
         deepTint        *= mix(vec3(0.85 * NIGHT_BRIGHTNESS), vec3(1.0), st.dayFactor);
 
         // Beer-Lambert optical absorption (scaled by WATER_CLARITY)
-        float absorbRate = 0.24 / max(WATER_CLARITY, 0.4);
+        float absorbRate = 0.20 / max(WATER_CLARITY, 0.4);
         float transmittance = exp(-waterThickness * absorbRate);
-        vec3 waterBodyColor = mix(deepTint * (0.45 + 0.55 * lm.y), shallowTint * (0.42 + 0.58 * lm.y), exp(-waterThickness * 0.35));
-        vec3 refractedWater = mix(waterBodyColor, refractedScene * mix(shallowTint * 1.25, vec3(1.0), transmittance * 0.65), clamp(transmittance, 0.12, 1.0));
+        vec3 waterBodyColor = mix(deepTint * (0.45 + 0.55 * lm.y), shallowTint * (0.45 + 0.55 * lm.y), exp(-waterThickness * 0.35));
+        vec3 refractedWater = mix(waterBodyColor, refractedScene * mix(shallowTint * 1.28, vec3(1.0), transmittance * 0.68), clamp(transmittance, 0.14, 1.0));
 
-        // Delicate Anime Shoreline Foam where water kisses shallow blocks
-        if (isEyeInWater == 0 && bgDepth < 0.9998) {
-            float foamEdge = 1.0 - smoothstep(0.04, 0.42, waterThickness);
-            float foamPattern = smoothstep(0.35, 0.72, valueNoise2D(vWorldPos.xz * 2.8 + vec2(frameTimeCounter * 0.45, -frameTimeCounter * 0.32)));
-            float foamMask = foamEdge * (0.45 + 0.55 * foamPattern) * smoothstep(0.0, 0.04, waterThickness);
+        // Delicate Anime Shoreline Foam where water meets shallow blocks
+        if (isEyeInWater == 0 && isTopWater && bgDepth < 0.9998) {
+            float foamEdge = 1.0 - smoothstep(0.04, 0.38, waterThickness);
+            float foamPattern = smoothstep(0.38, 0.74, valueNoise2D(vWorldPos.xz * 2.6 + vec2(frameTimeCounter * 0.42, -frameTimeCounter * 0.30)));
+            float foamMask = foamEdge * (0.42 + 0.58 * foamPattern) * smoothstep(0.0, 0.04, waterThickness);
             vec3 foamCol = mix(vec3(0.28, 0.44, 0.68) * NIGHT_BRIGHTNESS, vec3(0.92, 0.98, 1.05), st.dayFactor);
-            refractedWater = mix(refractedWater, foamCol, clamp(foamMask * 0.60, 0.0, 0.76));
+            refractedWater = mix(refractedWater, foamCol, clamp(foamMask * 0.55, 0.0, 0.70));
         }
 
-        // Fresnel Sky + Cloud + Aurora Reflection
+        // Fresnel Sky + Cloud + Aurora Reflection (balanced so crystal seabed stays clear!)
         float NdotV = max(dot(waveWNorm, -worldViewDir), 0.0);
-        float fresnel = 0.035 + 0.965 * pow(1.0 - NdotV, 4.4);
-        fresnel = clamp(fresnel, 0.04, 0.92);
+        float fresnel = 0.03 + 0.97 * pow(1.0 - NdotV, 4.6);
+        fresnel = clamp(fresnel, 0.03, 0.78);
 
         vec3 reflDir = reflect(worldViewDir, waveWNorm);
         reflDir.y = max(reflDir.y, 0.015);
@@ -149,21 +161,20 @@ void main() {
         vec4 cloudRefl = renderAnimeClouds(reflDir, cameraPosition, st, frameTimeCounter, dither);
         skyRefl = skyRefl * (1.0 - cloudRefl.a) + cloudRefl.rgb;
 
-        // Indoor water reflects cozy ambient rather than full outdoor sky
         vec3 indoorRefl = mix(vec3(0.12, 0.18, 0.28), st.ambientSky * 0.85, lm.y) * max(CAVE_BRIGHTNESS, 0.9);
         vec3 envRefl = mix(indoorRefl, skyRefl, smoothstep(0.10, 0.85, lm.y));
 
-        vec3 waterFinal = mix(refractedWater, envRefl, fresnel * (isEyeInWater == 1 ? 0.35 : 0.86));
+        float reflWeight = isTopWater ? (isEyeInWater == 1 ? 0.32 : 0.80) : 0.35;
+        vec3 waterFinal = mix(refractedWater, envRefl, fresnel * reflWeight);
 
         // --- Twinkling Anime Water Sun & Moon Sparkles! ---
 #ifdef WATER_SPARKLES
-        if (lm.y > 0.35 && isEyeInWater == 0) {
+        if (lm.y > 0.35 && isEyeInWater == 0 && isTopWater) {
             vec3 H = safeNormalize(st.activeLightDir - worldViewDir);
             float NdotH = max(dot(waveWNorm, H), 0.0);
-            float broadGlint = pow(NdotH, 110.0) * 1.45;
-            // Crisp twinkling anime star glints on fine wave facets
-            float facetNoise = valueNoise2D(vWorldPos.xz * 7.5 + vec2(frameTimeCounter * 1.6, -frameTimeCounter * 1.1));
-            float sparkle = pow(NdotH, 280.0) * smoothstep(0.42, 0.82, facetNoise) * 6.5;
+            float broadGlint = pow(NdotH, 120.0) * 1.40;
+            float facetNoise = valueNoise2D(vWorldPos.xz * 7.5 + vec2(frameTimeCounter * 1.5, -frameTimeCounter * 1.0));
+            float sparkle = pow(NdotH, 260.0) * smoothstep(0.42, 0.82, facetNoise) * 6.0;
 
             vec3 glintCol = mix(vec3(0.75, 1.15, 1.65) * NIGHT_BRIGHTNESS, st.directColor * 1.45, st.dayFactor);
             float glintVis = smoothstep(0.35, 0.85, lm.y) * (1.0 - st.rainMix * 0.82) * smoothstep(-0.04, 0.08, st.activeLightDir.y);
@@ -171,13 +182,15 @@ void main() {
         }
 #endif
 
-        // Subtle warm blocklight reflection from nearby lanterns & torches
+        // Subtle warm blocklight shimmer from nearby lanterns & torches
         vec3 waterBlockLight = computeBlockAndHandLight(lm.x, viewDist, waveVNorm, viewDir, heldBlockLightValue, heldBlockLightValue2);
-        waterFinal += waterBlockLight * (0.14 + 0.24 * fresnel);
+        waterFinal += waterBlockLight * (0.12 + 0.20 * fresnel);
+
+        float enableSSR = (isEyeInWater == 0 && isTopWater) ? 1.0 : 0.0;
 
         colorOut      = vec4(max(waterFinal, vec3(0.0)), 1.0);
-        reflNormalOut = vec4(waveVNorm, 0.0);
-        ssrMaskOut    = vec4(isEyeInWater == 1 ? 0.0 : 1.0, fresnel, smoothstep(0.0, 0.25, waterThickness), 1.0);
+        reflNormalOut = vec4(ssrVNorm, 0.0);
+        ssrMaskOut    = vec4(enableSSR, fresnel, smoothstep(0.0, 0.22, waterThickness), 1.0);
         return;
     }
 
