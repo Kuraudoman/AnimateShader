@@ -16,7 +16,8 @@
 
 uniform sampler2D colortex0; // Lit HDR Scene (with translucent water/glass/particles)
 uniform sampler2D colortex1; // Water/Ice ViewNormal (on translucent) or Opaque ViewNormal + MatID
-uniform sampler2D colortex3; // Water/Ice SSR mask (x=strength, y=fresnel, z=depthFade)
+uniform sampler2D colortex2; // Water sky/cloud envRefl (for exact SSR sky replacement without washout)
+uniform sampler2D colortex3; // Water/Ice SSR mask (x=strength, y=reflAmount, z=depthFade)
 uniform sampler2D colortex4; // Clean opaque HDR scene from deferred (for SSR reflection lookup!)
 uniform sampler2D depthtex0; // Full depth (including translucent water/hand)
 uniform sampler2D depthtex1; // Opaque depth (for godrays & underwater thickness)
@@ -84,7 +85,7 @@ void main() {
                 vec3 waveWNorm = computeWaterWorldNormal(worldPos, vec3(0.0, 1.0, 0.0), viewDist, frameTimeCounter, rainStrength);
                 vec3 upVNorm   = safeNormalize(mat3(gbufferModelView) * vec3(0.0, 1.0, 0.0));
                 vec3 waveVNorm = safeNormalize(mat3(gbufferModelView) * waveWNorm);
-                reflViewNormal = safeNormalize(mix(upVNorm, waveVNorm, 0.55));
+                reflViewNormal = safeNormalize(mix(upVNorm, waveVNorm, 0.30));
             } else {
                 reflViewNormal = safeNormalize(normMat.xyz);
             }
@@ -93,6 +94,7 @@ void main() {
                 viewPos,
                 reflViewNormal,
                 dither,
+                far,
                 colortex4,
                 depthtex0,
                 depthtex1,
@@ -101,9 +103,20 @@ void main() {
                 gbufferModelViewInverse,
                 isWaterSSR
             );
-            float maskStrength = isWaterSSR ? 1.0 : ssrMask.x;
-            float reflBlend = clamp(ssr.a * maskStrength * ssrMask.y * ssrMask.z * 0.82, 0.0, 0.78);
-            color = mix(color, ssr.rgb, reflBlend);
+            if (ssr.a > 0.001) {
+                if (isWaterSSR) {
+                    // Exact optical replacement: substitute SSR hit for sky/cloud envRefl under the
+                    // same Fresnel weight so mountains reflect cleanly with zero sky-blue washout
+                    // while keeping sun/moon water sparkles intact!
+                    vec3 envRefl = texture(colortex2, vTexCoord).rgb;
+                    float ssrWeight = clamp(ssr.a * ssrMask.z, 0.0, 1.0);
+                    float waterReflAmt = clamp(ssrMask.y, 0.0, 0.90);
+                    color = max(color + (ssr.rgb - envRefl) * (waterReflAmt * ssrWeight), vec3(0.0));
+                } else {
+                    float reflBlend = clamp(ssr.a * ssrMask.x * ssrMask.y * ssrMask.z * 0.82, 0.0, 0.78);
+                    color = mix(color, ssr.rgb, reflBlend);
+                }
+            }
         }
 
         // --- 2. Pastel Anime Aerial Perspective & Status Fog ---

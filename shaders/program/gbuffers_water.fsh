@@ -52,10 +52,11 @@ in vec3 vViewNormal;
 in vec3 vWorldNormal;
 flat in int vBlockId;
 
-/* RENDERTARGETS: 0,1,3 */
+/* RENDERTARGETS: 0,1,2,3 */
 layout(location = 0) out vec4 colorOut;
 layout(location = 1) out vec4 reflNormalOut;
-layout(location = 2) out vec4 ssrMaskOut;
+layout(location = 2) out vec4 envReflOut;
+layout(location = 3) out vec4 ssrMaskOut;
 
 void main() {
     vec2 lm = clamp((vLmCoord - 0.03125) / 0.9375, 0.0, 1.0);
@@ -90,8 +91,8 @@ void main() {
 
         vec3 waveWNorm = computeWaterWorldNormal(vWorldPos, baseWNorm, viewDist, frameTimeCounter, rainStrength);
         vec3 waveVNorm = safeNormalize(mat3(gbufferModelView) * waveWNorm);
-        // Smoother reflection normal keeps mountain/tree SSR glassy and continuous
-        vec3 ssrVNorm  = safeNormalize(mix(baseVNorm, waveVNorm, 0.55));
+        // Gentle ripple normal for SSR keeps reflected mountains & treetops crisp and recognizable
+        vec3 ssrVNorm  = safeNormalize(mix(baseVNorm, waveVNorm, 0.30));
 
         // Compute true geometric water column thickness along the view ray
         float bgDepth = texture(depthtex1, screenUV).r;
@@ -155,6 +156,7 @@ void main() {
 
             colorOut      = vec4(max(waterFinal, vec3(0.0)), 1.0);
             reflNormalOut = vec4(ssrVNorm, 1.0);
+            envReflOut    = vec4(0.0, 0.0, 0.0, 1.0);
             ssrMaskOut    = vec4(0.0, 0.0, 0.0, 1.0);
             return;
         }
@@ -188,10 +190,13 @@ void main() {
             refractedWater = mix(refractedWater, foamCol, clamp(foamMask * 0.55, 0.0, 0.70));
         }
 
-        // Fresnel Sky + Cloud + Aurora Reflection (balanced so crystal seabed stays clear!)
-        float NdotV = max(dot(waveWNorm, -worldViewDir), 0.0);
-        float fresnel = 0.03 + 0.97 * pow(1.0 - NdotV, 4.6);
-        fresnel = clamp(fresnel, 0.03, 0.78);
+        // Fresnel Sky + Cloud + Aurora Reflection:
+        // Crisp mirror-like reflections across grazing & mid angles (full mountain + treetop!)
+        // while keeping steep downward views crystal clear into the seabed
+        vec3 fresnelNorm = safeNormalize(mix(baseWNorm, waveWNorm, 0.45));
+        float NdotV = max(dot(fresnelNorm, -worldViewDir), 0.0);
+        float fresnel = 0.06 + 0.89 * pow(1.0 - NdotV, 2.5);
+        fresnel = clamp(fresnel, 0.06, 0.90);
 
         vec3 reflDir = reflect(worldViewDir, waveWNorm);
         reflDir.y = max(reflDir.y, 0.015);
@@ -202,8 +207,9 @@ void main() {
         vec3 indoorRefl = mix(vec3(0.12, 0.18, 0.28), st.ambientSky * 0.85, lm.y) * max(CAVE_BRIGHTNESS, 0.9);
         vec3 envRefl = mix(indoorRefl, skyRefl, smoothstep(0.10, 0.85, lm.y));
 
-        float reflWeight = isTopWater ? 0.80 : 0.35;
-        vec3 waterFinal = mix(refractedWater, envRefl, fresnel * reflWeight);
+        float reflWeight = isTopWater ? 0.92 : 0.40;
+        float waterReflAmt = fresnel * reflWeight;
+        vec3 waterFinal = mix(refractedWater, envRefl, waterReflAmt);
 
         // --- Twinkling Anime Water Sun & Moon Sparkles! ---
 #ifdef WATER_SPARKLES
@@ -229,7 +235,8 @@ void main() {
 
         colorOut      = vec4(max(waterFinal, vec3(0.0)), 1.0);
         reflNormalOut = vec4(ssrVNorm, 1.0);
-        ssrMaskOut    = vec4(enableSSR, fresnel, smoothstep(0.0, 0.22, waterThickness), 1.0);
+        envReflOut    = vec4(max(envRefl, vec3(0.0)), 1.0);
+        ssrMaskOut    = vec4(enableSSR, waterReflAmt, smoothstep(0.0, 0.22, waterThickness), 1.0);
         return;
     }
 
@@ -252,6 +259,7 @@ void main() {
 
         colorOut      = vec4(portalCol, clamp(tex.a, 0.55, 0.92));
         reflNormalOut = vec4(safeNormalize(vViewNormal), 1.0);
+        envReflOut    = vec4(0.0, 0.0, 0.0, 1.0);
         ssrMaskOut    = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
@@ -300,6 +308,7 @@ void main() {
 
     colorOut      = vec4(max(lit, vec3(0.0)), outAlpha);
     reflNormalOut = vec4(vNorm, 1.0);
+    envReflOut    = vec4(0.0, 0.0, 0.0, 1.0);
     // Give above-water translucent ice subtle SSR reflection; cleanly zero colortex3 otherwise
     ssrMaskOut    = enableIceSSR ? vec4(0.45, fresnel * 0.55, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
 }
