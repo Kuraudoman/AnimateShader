@@ -34,6 +34,7 @@ uniform vec3 shadowLightPosition;
 
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
+uniform mat4 gbufferProjection;
 uniform mat4 gbufferProjectionInverse;
 
 uniform vec3 sunPosition;
@@ -123,6 +124,8 @@ vec3 reconstructOpaqueWorldNormal(
 }
 
 void main() {
+    gl_FragDepth = gl_FragCoord.z;
+
     vec2 lm = clamp((vLmCoord - 0.03125) / 0.9375, 0.0, 1.0);
     vec2 invRes = 1.0 / max(vec2(viewWidth, viewHeight), vec2(1.0));
     vec2 screenUV = gl_FragCoord.xy * invRes;
@@ -233,6 +236,23 @@ void main() {
                 vec3 tirCol = uwCol * (0.82 + 0.18 * rippleShimmer);
                 float fresnelUW = clamp(0.14 + 0.48 * pow(1.0 - NdotV_uw, 2.5), 0.14, 0.72);
                 waterFinal = mix(transmitted, tirCol, fresnelUW);
+
+                // Sodium (>=0.8.10) / vanilla emit inward-facing water underside quads at y = N + 8/9
+                // (~0.111 blocks closer than an overlying ice/glass ceiling at y = N + 1.0) in a
+                // 3x3..5x5 neighborhood around any broken/air block (MC-175133 / Sodium #2931).
+                // Push overhead water-surface depth along the view ray past the overlying 1-block
+                // ice/glass layer (clamped strictly in front of opaque depthtex1) so intact ice
+                // ceilings and 3D hole rims always win the Z-test in any draw order while open
+                // water & shorelines remain seamless!
+                if (abs(baseWNorm.y) > 0.5 && playerPos.y > 0.001) {
+                    float yTarget = ceil(vWorldPos.y - 0.04) + 1.05;
+                    float rayScale = clamp((yTarget - cameraPosition.y) / max(playerPos.y, 0.001), 1.0, 256.0);
+                    float targetDepth = viewToScreen(vViewPos * rayScale, gbufferProjection).z;
+                    float maxAllowedDepth = (bgDepth < 0.999999)
+                        ? max(gl_FragCoord.z, bgDepth - 0.000002)
+                        : max(gl_FragCoord.z, 0.99998);
+                    gl_FragDepth = clamp(targetDepth, gl_FragCoord.z, maxAllowedDepth);
+                }
             } else {
                 // Viewing water while submerged in lava or powder snow
                 waterFinal = refractedScene;
