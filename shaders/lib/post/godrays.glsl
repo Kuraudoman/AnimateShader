@@ -16,6 +16,7 @@ vec3 computeAnimeGodrays(
     AnimeLightingState st,
     float dither,
     sampler2D depthOpaqueTex,
+    sampler2D auxMaskTex,
     mat4 proj,
     float aspectRatioVal,
     int eyeInWater
@@ -62,6 +63,11 @@ vec3 computeAnimeGodrays(
         float d = texture(depthOpaqueTex, sampleUV).r;
         // Sky pixels (d >= 0.9995) transmit shafts of light past terrain/leaves!
         float skyMask = step(0.9995, d);
+        if (eyeInWater == 1 && skyMask > 0.5) {
+            // Solid underwater ice blocks direct sun shafts so sunlight does not X-ray through ice
+            float iceOcc = texture(auxMaskTex, sampleUV).z;
+            skyMask *= (1.0 - smoothstep(0.25, 0.75, iceOcc));
+        }
         accum += skyMask * illumDecay;
         illumDecay *= DECAY;
     }

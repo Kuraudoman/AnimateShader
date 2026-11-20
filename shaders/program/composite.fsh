@@ -158,6 +158,7 @@ void main() {
             st,
             dither,
             depthtex1,
+            colortex3,
             gbufferProjection,
             aspectRatio,
             isEyeInWater

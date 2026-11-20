@@ -440,14 +440,22 @@ void main() {
     vec3 H = safeNormalize(st.activeLightDir - worldViewDir);
     float spec = pow(max(dot(wNorm, H), 0.0), 72.0) * 1.35 * skyF;
 
+    bool isIce = (vBlockId == 10002);
+
     if (isEyeInWater == 0) {
         vec3 skyTintRefl = mix(st.ambientSky, st.skyHorizon, 0.5) * fresnel * (0.45 + 0.55 * skyF);
         lit += skyTintRefl + st.directColor * spec;
     } else {
         // Underwater ice & glass: calm deep-blue crystal sheen + spectral filter + accurate fog!
-        // Background in colortex0 is already fogged by deferred.fsh -> ZERO underwater X-ray!
         if (isEyeInWater == 1) {
             vec3 uwFilter = mix(computeUnderwaterLightFilter(st), vec3(1.0), clamp(lm.x * 0.65, 0.0, 1.0));
+            if (isIce) {
+                // Opaque frosted ice underwater: soft diffused skylight keeps the underside naturally
+                // lit with crisp glacial detail while completely eliminating see-through X-ray!
+                float frostSkyScale = mix(0.32, 0.55, st.dayFactor);
+                vec3 frostTrans = (st.ambientSky * frostSkyScale + st.directColor * 0.14 * max(st.activeLightDir.y, 0.0)) * skyF;
+                lit += albedoLinear * frostTrans;
+            }
             lit *= uwFilter;
             vec3 uwSheen = computeUnderwaterFogColor(worldViewDir, st) * fresnel * 0.34;
             lit += uwSheen + st.directColor * uwFilter * spec * 0.18;
@@ -455,14 +463,19 @@ void main() {
         lit = applyAnimeFog(lit, playerPos, worldViewDir, viewDist, far, st, isEyeInWater, 0.0, 0.0);
     }
 
-    bool isIce = (vBlockId == 10002);
-    float outAlpha = clamp(tex.a + fresnel * (isIce ? 0.28 : 0.18), 0.05, 0.96);
+    // Make ice fully opaque underwater so mountains, snow ledges, terrain & sky never X-ray through ice!
+    float outAlpha = (isIce && isEyeInWater > 0)
+        ? 1.0
+        : clamp(tex.a + fresnel * (isIce ? 0.28 : 0.18), 0.05, 0.96);
     bool enableIceSSR = isIce && (isEyeInWater == 0);
 
     colorOut      = vec4(max(lit, vec3(0.0)), outAlpha);
     reflNormalOut = vec4(vNorm, 1.0);
     envReflOut    = vec4(0.0, 0.0, 0.0, 1.0);
-    // Give above-water translucent ice subtle SSR reflection; cleanly zero colortex3 otherwise
-    ssrMaskOut    = enableIceSSR ? vec4(0.45, fresnel * 0.55, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+    // Above-water translucent ice gets subtle SSR reflection; underwater ice flags colortex3.z = 1.0
+    // so composite.fsh godrays treat solid underwater ice as a light occluder rather than open sky!
+    ssrMaskOut    = enableIceSSR
+        ? vec4(0.45, fresnel * 0.55, 1.0, 1.0)
+        : vec4(0.0, 0.0, (isIce && isEyeInWater > 0) ? 1.0 : 0.0, 1.0);
 }
 
