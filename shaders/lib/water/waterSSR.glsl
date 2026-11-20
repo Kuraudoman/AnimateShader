@@ -76,15 +76,23 @@ vec4 traceAnimeSSR(
     // Trace across the full render distance regardless of how close the camera/water pixel is!
     float sMax = max(renderFar * 1.5, 320.0);
 
-    // Exact homogeneous clip-space frustum exit distance (all 6 clip planes):
+    // Horizontal & top overscan lets reflected rays that drift slightly outside screen borders
+    // under downward camera pitch continue marching smoothly against edge terrain instead of
+    // vanishing into a wide sky-colored wedge along the left, right, or top screen edges!
+    const float OVERSCAN_X     = 0.32;
+    const float OVERSCAN_Y_TOP = 0.16;
+    const float xBound         = 1.0 + 2.0 * OVERSCAN_X;
+    const float yTopBound      = 1.0 + 2.0 * OVERSCAN_Y_TOP;
+
+    // Exact homogeneous clip-space frustum exit distance (all 6 clip planes, expanded on L/R/Top):
     // Inside frustum <=> a + s * b >= 0  =>  when b < 0, exit occurs at s = max(a, 0) / (-b)
     vec4 aXY = vec4(
-        startClip.w + startClip.x, startClip.w - startClip.x,
-        startClip.w + startClip.y, startClip.w - startClip.y
+        xBound * startClip.w + startClip.x, xBound * startClip.w - startClip.x,
+        startClip.w + startClip.y,          yTopBound * startClip.w - startClip.y
     );
     vec4 bXY = vec4(
-        dirClip.w + dirClip.x, dirClip.w - dirClip.x,
-        dirClip.w + dirClip.y, dirClip.w - dirClip.y
+        xBound * dirClip.w + dirClip.x, xBound * dirClip.w - dirClip.x,
+        dirClip.w + dirClip.y,          yTopBound * dirClip.w - dirClip.y
     );
     if (bXY.x < -1e-6) sMax = min(sMax, max(aXY.x, 0.0) / (-bXY.x));
     if (bXY.y < -1e-6) sMax = min(sMax, max(aXY.y, 0.0) / (-bXY.y));
@@ -126,7 +134,7 @@ vec4 traceAnimeSSR(
     // Guarantees fine resolution in BOTH 2D screen space (thin trees/silhouettes) and
     // 3D relative depth (distant mountains even when water is < 0.2 blocks below camera!)
     const float SCREEN_WEIGHT = 10.0;
-    const int   MAX_STEPS     = 56;
+    const int   MAX_STEPS     = 64;
     float totalMetric = SCREEN_WEIGHT * screenLen + logDepthLen;
     float dM = totalMetric / float(MAX_STEPS - 1);
 
@@ -145,8 +153,10 @@ vec4 traceAnimeSSR(
     float prevValidS    = 0.0;
     float prevValidRayZ = -startView.z;
 
-    bool hit = false;
-    vec2 hitUV = vec2(0.0);
+    bool  hit       = false;
+    vec2  hitUV     = vec2(0.0);
+    vec2  hitScr    = vec2(0.0);
+    float hitSceneZ = 0.0;
 
     for (int i = 0; i < MAX_STEPS; i++) {
         vec4 curClip = startClip + dirClip * s;
@@ -155,13 +165,14 @@ vec4 traceAnimeSSR(
         }
 
         vec3 curScr = (curClip.xyz / curClip.w) * 0.5 + 0.5;
-        if (curScr.x < 0.0 || curScr.x > 1.0 || curScr.y < 0.0 || curScr.y > 1.0) {
+        if (curScr.x < -OVERSCAN_X || curScr.x > 1.0 + OVERSCAN_X || curScr.y < 0.0 || curScr.y > 1.0 + OVERSCAN_Y_TOP) {
             break;
         }
         if (curScr.z <= 0.0 || curScr.z >= 0.999999) {
             break;
         }
 
+        bool curOffScreen = (curScr.x < 0.0 || curScr.x > 1.0 || curScr.y > 1.0);
         vec2 curUV = clamp(curScr.xy, vec2(0.0005), vec2(0.9995));
         float opaqueDepth = texture(depthOpaqueTex, curUV).r;
         float curRayZ = -(startView.z + reflDir.z * s);
@@ -192,7 +203,9 @@ vec4 traceAnimeSSR(
                     }
 
                     float stepZ = max(abs(curRayZ - prevRayZ), 0.5);
-                    bool crossedFromWater = (prevValidRayZ <= sceneDistZ + 1.0) && (prevValidS < prevS);
+                    // Only allow wide water-crossing tolerance on screen; in overscan keep tight stepZ
+                    // so close foreground objects on the screen border never smear into distant water!
+                    bool crossedFromWater = (!curOffScreen) && (prevValidRayZ <= sceneDistZ + 1.0) && (prevValidS < prevS);
                     float effStepZ = crossedFromWater ? max(curRayZ - prevValidRayZ, stepZ) : stepZ;
                     float maxThickness = max(effStepZ * 2.5 + sceneDistZ * 0.08, 1.5);
 
@@ -243,10 +256,13 @@ vec4 traceAnimeSSR(
                                 vec3 fPlayer = (modelViewInv * vec4(fView, 1.0)).xyz;
                                 fHeightOk = (fPlayer.y >= waterPlayerPos.y - 0.08);
                             }
-                            float fMaxTol = max(effStepZ * 1.2 + fSceneZ * 0.06, 1.5);
+                            bool fOffScreen = (finalScr.x < 0.0 || finalScr.x > 1.0 || finalScr.y > 1.0);
+                            float fMaxTol = max((fOffScreen ? stepZ : effStepZ) * 1.2 + fSceneZ * 0.06, 1.5);
                             if (fHeightOk && abs(fRayZ - fSceneZ) <= fMaxTol) {
-                                hitUV = finalUV;
-                                hit = true;
+                                hitUV     = finalUV;
+                                hitScr    = finalScr.xy;
+                                hitSceneZ = fSceneZ;
+                                hit       = true;
                                 break;
                             }
                         }
@@ -277,14 +293,56 @@ vec4 traceAnimeSSR(
 
     if (!hit) return vec4(0.0);
 
-    // Smooth border fade into sky/cloud reflection (preserves tall mountain peaks near top edge)
-    float edgeX = smoothstep(0.0, 0.04, hitUV.x) * smoothstep(1.0, 0.96, hitUV.x);
-    float edgeY = smoothstep(0.0, 0.03, hitUV.y) * smoothstep(1.0, 0.95, hitUV.y);
+    // Keep 100% reflection strength across the entire visible screen (zero border disappearance!),
+    // fading smoothly into sky/cloud reflection only deep in the off-screen overscan region.
+    float offX     = max(max(-hitScr.x, hitScr.x - 1.0), 0.0);
+    float offY     = max(hitScr.y - 1.0, 0.0);
+    float edgeX    = 1.0 - smoothstep(0.18, OVERSCAN_X, offX);
+    float edgeY    = smoothstep(0.0, 0.015, hitScr.y) * (1.0 - smoothstep(0.04, OVERSCAN_Y_TOP, offY));
     float edgeFade = edgeX * edgeY;
     float backFade = smoothstep(0.35, -0.10, reflDir.z);
     float confidence = clamp(edgeFade * backFade, 0.0, 1.0);
 
     vec3 reflColor = texture(sceneColorTex, hitUV).rgb;
+
+    // For overscan hits past the left/right/top borders, smoothly average 3 depth-validated inward
+    // taps so extended shoreline & forest reflections look natural instead of 1-pixel edge streaks.
+    if (offX > 0.0001 || offY > 0.0001) {
+        float inwardX  = (hitScr.x < 0.0) ? 1.0 : ((hitScr.x > 1.0) ? -1.0 : 0.0);
+        float inwardY  = (hitScr.y > 1.0) ? -1.0 : 0.0;
+        float spreadX  = clamp(offX * 0.28, 0.0, 0.045);
+        float spreadY  = clamp(offY * 0.24, 0.0, 0.032);
+        float depthTol = max(hitSceneZ * 0.18, 2.5);
+
+        vec3  accumCol = reflColor;
+        float accumW   = 1.0;
+        for (int t = 1; t <= 3; t++) {
+            float frac = float(t) * 0.333333;
+            float wt   = 1.05 - 0.24 * float(t);
+            vec2 tapUV = clamp(
+                hitUV + vec2(inwardX * spreadX * frac, inwardY * spreadY * frac),
+                vec2(0.0005),
+                vec2(0.9995)
+            );
+            float tOpaque = texture(depthOpaqueTex, tapUV).r;
+            if (tOpaque < 0.999999) {
+                bool tValid = true;
+                if (rejectBelowSurface) {
+                    float tAll = texture(depthAllTex, tapUV).r;
+                    tValid = (tOpaque - tAll <= 1e-6);
+                }
+                if (tValid) {
+                    float tZ = ssrLinearViewDistZ(tOpaque, projInv);
+                    if (abs(tZ - hitSceneZ) <= depthTol) {
+                        accumCol += texture(sceneColorTex, tapUV).rgb * wt;
+                        accumW   += wt;
+                    }
+                }
+            }
+        }
+        reflColor = accumCol / accumW;
+    }
+
     return vec4(reflColor, confidence);
 #endif
 }

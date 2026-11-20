@@ -56,13 +56,14 @@ void main() {
         vec3 playerPos = (gbufferModelViewInverse * vec4(vViewPos, 1.0)).xyz;
         vec3 worldViewDir = safeNormalize((gbufferModelViewInverse * vec4(safeNormalize(vViewPos), 0.0)).xyz);
 
-        // Vanilla underwater ambient specks are dark sRGB squares that turn pitch-black in linear HDR:
-        // lift them into delicate, semi-translucent shimmering aqua motes!
+        // Vanilla underwater ambient specks are dark sRGB squares that turn starkly black in linear HDR:
+        // filter regular underwater particles spectrally and lift dark specks into delicate blue motes!
         if (isEyeInWater == 1 && magicGlow < 0.2) {
-            float darkMask = 1.0 - smoothstep(0.02, 0.14, luma(albedoLinear));
-            vec3 aquaMote = mix(vec3(0.08, 0.34, 0.54) * max(NIGHT_BRIGHTNESS, 1.0), vec3(0.24, 0.70, 0.88), st.dayFactor);
-            lit = mix(lit, aquaMote, darkMask * 0.88);
-            outAlpha *= mix(1.0, 0.38, darkMask);
+            lit *= mix(computeUnderwaterLightFilter(st), vec3(1.0), clamp(lm.x * 0.65, 0.0, 1.0));
+            float darkMask = 1.0 - smoothstep(0.04, 0.22, luma(albedoLinear));
+            vec3 aquaMote = computeUnderwaterFogColor(worldViewDir, st) * 1.55;
+            lit = mix(lit, aquaMote, darkMask * 0.90);
+            outAlpha *= mix(1.0, 0.34, darkMask);
         }
 
         lit = applyAnimeFog(lit, playerPos, worldViewDir, viewDist, far, st, isEyeInWater, 0.0, 0.0);

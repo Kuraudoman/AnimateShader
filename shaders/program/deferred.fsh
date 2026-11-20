@@ -95,8 +95,12 @@ void main() {
         vec4 clouds = renderAnimeClouds(worldDir, cameraPosition, st, frameTimeCounter, dither);
         skyCol = skyCol * (1.0 - clouds.a) + clouds.rgb;
 
-        // When submerged, apply medium fog before translucents (ice/glass/water) draw
+        vec3 rawSkyCol = skyCol;
+
+        // When submerged, apply medium fog to colortex0 before translucents (ice/glass) draw
         // so distant sky behind underwater ice never X-rays through!
+        // Keep colortex4 clean when isEyeInWater == 1 so looking up through the water surface
+        // sees the true sky & clouds attenuated strictly by water-column depth in gbuffers_water.fsh.
         if (isEyeInWater > 0) {
             skyCol = applyAnimeFog(
                 skyCol,
@@ -113,7 +117,7 @@ void main() {
 
         sceneColorOut = vec4(skyCol, 1.0);
         resetAuxOut   = vec4(0.0, 0.0, 0.0, 1.0);
-        opaqueCopyOut = vec4(skyCol, 1.0);
+        opaqueCopyOut = vec4((isEyeInWater == 1) ? rawSkyCol : skyCol, 1.0);
         return;
     }
 
@@ -217,6 +221,24 @@ void main() {
         frameTimeCounter
     );
 
+    // Preserve clean above-water scene (normal aerial perspective, no underwater fog/caustics)
+    // in colortex4 when isEyeInWater == 1 so looking up through the water surface sees outside
+    // trees, mountains & terrain crisply with accurate water-column attenuation!
+    vec3 airCopyColor = litColor + additiveGlow;
+    if (isEyeInWater == 1 && !isHand) {
+        airCopyColor = applyAnimeFog(
+            airCopyColor,
+            feetPlayerPos,
+            worldViewDir,
+            viewDist,
+            far,
+            st,
+            0,
+            0.0,
+            0.0
+        );
+    }
+
     // Sparkling underwater caustics when the player is submerged
     if (isEyeInWater == 1 && !isHand && !isUnlit) {
         float upFace = smoothstep(0.45, 0.85, worldNormal.y);
@@ -224,8 +246,8 @@ void main() {
         if (upFace > 0.005 && caustSunVis > 0.005) {
             float caust = computeUnderwaterCaustics(worldPos, st.activeLightDir, frameTimeCounter);
             float caustFade = exp(-viewDist * 0.032) * smoothstep(0.15, 0.85, lightmap.y) * caustSunVis;
-            vec3 caustCol = mix(vec3(0.32, 0.86, 1.15), vec3(0.55, 1.08, 1.22), st.dayFactor);
-            litColor += albedoLinear * caustCol * caust * upFace * caustFade * luma(shadowTrans) * 0.70;
+            vec3 caustCol = mix(vec3(0.24, 0.56, 0.98), vec3(0.34, 0.68, 1.06), st.dayFactor);
+            litColor += albedoLinear * caustCol * caust * upFace * caustFade * luma(shadowTrans) * 0.55;
         }
     }
 
@@ -235,6 +257,11 @@ void main() {
     // Apply accurate distance-based underwater/lava/snow fog to opaque terrain BEFORE
     // translucents (ice/glass/water) draw so distant mountains never X-ray through ice!
     if (isEyeInWater > 0 && !isHand) {
+        if (isEyeInWater == 1 && !isUnlit) {
+            // Spectral attenuation of daylight/moonlight entering water (preserves emissives & torches)
+            vec3 uwFilter = mix(computeUnderwaterLightFilter(st), vec3(1.0), clamp(emissiveVal + lightmap.x * 0.65, 0.0, 1.0));
+            litColor *= uwFilter;
+        }
         litColor = applyAnimeFog(
             litColor,
             feetPlayerPos,
@@ -250,6 +277,6 @@ void main() {
 
     sceneColorOut = vec4(litColor, 1.0);
     resetAuxOut   = vec4(0.0, 0.0, 0.0, 1.0);
-    opaqueCopyOut = vec4(litColor, 1.0);
+    opaqueCopyOut = vec4((isEyeInWater == 1) ? airCopyColor : litColor, 1.0);
 }
 

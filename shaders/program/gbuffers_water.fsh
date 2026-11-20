@@ -171,22 +171,31 @@ void main() {
             bgWorldPos = bgPlayer + cameraPosition;
         }
 
-        // Gentle, clean refraction for underwater blocks (never bleeds foreground or above-water cliffs!)
-        float refractStrength = 0.010 * smoothstep(0.0, 1.8, waterThickness) / (1.0 + viewDist * 0.075);
+        // Gentle, clean refraction for underwater blocks & submerged upward views (never bleeds foreground!)
+        float refractStrength = (isEyeInWater == 1)
+            ? (0.012 / (1.0 + viewDist * 0.08))
+            : (0.010 * smoothstep(0.0, 1.8, waterThickness) / (1.0 + viewDist * 0.075));
         vec2 refractOffset = (waveVNorm.xy - baseVNorm.xy) * refractStrength;
         vec2 refractUV = clamp(screenUV + refractOffset, vec2(0.002), vec2(0.998));
 
         float refrDepth = texture(depthtex1, refractUV).r;
         vec3 refrViewPos  = bgViewPos;
         vec3 refrWorldPos = bgWorldPos;
-        if (refrDepth <= gl_FragCoord.z + 0.00005 || refrDepth >= 0.999999) {
+        if (isEyeInWater == 1) {
+            // Only reject foreground submerged blocks in front of the water surface so both
+            // above-water trees/hills and sky/clouds ripple cleanly together across the surface
+            if (refrDepth <= gl_FragCoord.z + 0.00005) {
+                refractUV = screenUV;
+                refrDepth = bgDepth;
+            }
+        } else if (refrDepth <= gl_FragCoord.z + 0.00005 || refrDepth >= 0.999999) {
             refractUV = screenUV;
             refrDepth = bgDepth;
         } else {
             vec3 candViewPos  = screenToView(refractUV, refrDepth, gbufferProjectionInverse);
             vec3 candWorldPos = (gbufferModelViewInverse * vec4(candViewPos, 1.0)).xyz + cameraPosition;
             // Reject refracted samples that belong to above-water shore/cliffs when viewing from above water
-            if (isEyeInWater == 0 && candWorldPos.y > vWorldPos.y + 0.05) {
+            if (candWorldPos.y > vWorldPos.y + 0.05) {
                 refractUV = screenUV;
                 refrDepth = bgDepth;
             } else {
@@ -198,28 +207,38 @@ void main() {
         vec3 refractedScene = texture(colortex4, refractUV).rgb;
 
         if (isEyeInWater > 0) {
-            // --- SUBMERGED VIEW OF WATER SURFACE (Snell's Window + Aqua Total Internal Reflection) ---
-            // Background in colortex4 already has accurate distance-based underwater fog from deferred.fsh!
             vec3 effWNorm = (dot(waveWNorm, -worldViewDir) < 0.0) ? -waveWNorm : waveWNorm;
             float NdotV_uw = max(dot(effWNorm, -worldViewDir), 0.0);
-            vec3 uwCol = computeUnderwaterFogColor(worldViewDir, st);
-
-            // Snell's window looking steeply upward vs. shimmering aqua TIR at grazing angles
-            float snellWindow = smoothstep(0.46, 0.76, NdotV_uw) * smoothstep(0.02, 0.25, worldViewDir.y);
-            float rippleShimmer = clamp(0.5 + 4.5 * (waveWNorm.x + waveWNorm.z), 0.0, 1.0);
-            vec3 tirCol = uwCol * (0.90 + 0.16 * rippleShimmer);
-
             vec3 waterFinal;
-            if (isEyeInWater == 1 && bgDepth >= 0.999999 && snellWindow > 0.01) {
-                vec3 skyLookDir = safeNormalize(vec3(worldViewDir.x, max(worldViewDir.y, 0.08), worldViewDir.z));
-                vec3 skyHint = renderAnimeSky(skyLookDir, st, frameTimeCounter, endFlashIntensity, endFlashDir);
-                vec3 snellCol = mix(refractedScene, mix(uwCol, skyHint * 0.52, 0.58), 0.65);
-                waterFinal = mix(tirCol, snellCol, snellWindow);
+
+            if (isEyeInWater == 1) {
+                // --- SUBMERGED VIEW LOOKING OUT AT THE ABOVE-WATER WORLD ---
+                // colortex4 carries the clean above-water scene (trees, hills, clouds, sky) with
+                // normal aerial perspective and NO underwater fog, so we apply serene oceanic
+                // optical transmission + gentle ripple Fresnel + exact water-column fog over viewDist!
+                vec3 uwCol = computeUnderwaterFogColor(worldViewDir, st);
+
+                // Soft HDR highlight rolloff keeps daytime sky, sun & clouds calm and atmospheric
+                vec3 compScene = refractedScene / (1.0 + refractedScene * 0.38);
+                float sceneLuma = luma(compScene);
+                vec3 cooledScene = mix(vec3(sceneLuma), compScene, 0.58);
+
+                // Spectral transmission through the air-water surface (deep cobalt-blue day, clear night)
+                vec3 surfTint = mix(vec3(0.56, 0.68, 0.96), vec3(0.36, 0.46, 0.74), st.dayFactor);
+                vec3 transmitted = cooledScene * surfTint;
+
+                // Subtle wave-rippled internal reflection veil that strengthens smoothly at grazing
+                // angles while keeping trees, foliage & clouds crisp and legible across upward views
+                float rippleShimmer = clamp(0.5 + 3.2 * (waveWNorm.x + waveWNorm.z), 0.0, 1.0);
+                vec3 tirCol = uwCol * (0.82 + 0.18 * rippleShimmer);
+                float fresnelUW = clamp(0.14 + 0.48 * pow(1.0 - NdotV_uw, 2.5), 0.14, 0.72);
+                waterFinal = mix(transmitted, tirCol, fresnelUW);
             } else {
-                waterFinal = mix(tirCol, refractedScene, 0.28 + 0.72 * snellWindow);
+                // Viewing water while submerged in lava or powder snow
+                waterFinal = refractedScene;
             }
 
-            // Fade distant underwater water surfaces smoothly into medium fog (never X-rays!)
+            // Apply true water-column absorption & scatter strictly over viewDist (eye -> water surface!)
             waterFinal = applyAnimeFog(waterFinal, playerPos, worldViewDir, viewDist, far, st, isEyeInWater, 0.0, 0.0);
 
             colorOut      = vec4(max(waterFinal, vec3(0.0)), 1.0);
@@ -425,10 +444,14 @@ void main() {
         vec3 skyTintRefl = mix(st.ambientSky, st.skyHorizon, 0.5) * fresnel * (0.45 + 0.55 * skyF);
         lit += skyTintRefl + st.directColor * spec;
     } else {
-        // Underwater ice & glass: subtle aqua-tinted crystal sheen + accurate underwater fog!
+        // Underwater ice & glass: calm deep-blue crystal sheen + spectral filter + accurate fog!
         // Background in colortex0 is already fogged by deferred.fsh -> ZERO underwater X-ray!
-        vec3 uwSheen = computeUnderwaterFogColor(worldViewDir, st) * fresnel * 0.38;
-        lit += uwSheen + st.directColor * spec * 0.25;
+        if (isEyeInWater == 1) {
+            vec3 uwFilter = mix(computeUnderwaterLightFilter(st), vec3(1.0), clamp(lm.x * 0.65, 0.0, 1.0));
+            lit *= uwFilter;
+            vec3 uwSheen = computeUnderwaterFogColor(worldViewDir, st) * fresnel * 0.34;
+            lit += uwSheen + st.directColor * uwFilter * spec * 0.18;
+        }
         lit = applyAnimeFog(lit, playerPos, worldViewDir, viewDist, far, st, isEyeInWater, 0.0, 0.0);
     }
 

@@ -11,11 +11,23 @@
 // ==============================================================================
 
 vec3 computeUnderwaterFogColor(vec3 worldDir, AnimeLightingState st) {
-    vec3 uwDay   = vec3(0.04, 0.34, 0.54);
-    vec3 uwNight = vec3(0.025, 0.11, 0.24) * max(NIGHT_BRIGHTNESS, 1.0);
+    vec3 uwDay   = vec3(0.032, 0.066, 0.165);
+    vec3 uwNight = vec3(0.015, 0.036, 0.095) * max(NIGHT_BRIGHTNESS, 1.0);
     vec3 uwCol   = mix(uwNight, uwDay, st.dayFactor);
-    uwCol += vec3(0.06, 0.24, 0.32) * smoothstep(-0.1, 0.8, worldDir.y) * (0.4 + 0.6 * st.dayFactor);
+
+    // Gentle upward skylight gradient through water (serene deep cobalt-cerulean, never blinding cyan)
+    float upGrad = smoothstep(-0.15, 0.85, worldDir.y);
+    uwCol += vec3(0.028, 0.052, 0.115) * upGrad * (0.25 + 0.75 * st.dayFactor) * (1.0 - st.rainMix * 0.40);
+
+    // Subtle twilight indigo-violet warmth at sunset & calm muted slate in rain
+    uwCol = mix(uwCol, uwCol * vec3(1.18, 0.90, 1.02), st.sunsetFactor * 0.30);
+    uwCol = mix(uwCol, uwCol * vec3(0.82, 0.88, 0.86), st.rainMix * 0.35);
     return uwCol;
+}
+
+// Spectral attenuation of sunlight/moonlight filtered through water (red absorbed fastest, blue preserved)
+vec3 computeUnderwaterLightFilter(AnimeLightingState st) {
+    return mix(vec3(0.56, 0.68, 0.96), vec3(0.36, 0.48, 0.76), st.dayFactor);
 }
 
 vec3 applyStatusFog(vec3 color, float viewDist, float blindnessVal, float darknessVal) {
@@ -42,10 +54,12 @@ vec3 applyAnimeFog(
     float darknessVal
 ) {
     if (eyeInWater == 1) {
-        float clarityScale = 0.022 / max(WATER_CLARITY, 0.4);
-        float uwFog = 1.0 - exp(-viewDist * clarityScale);
-        vec3 uwCol = computeUnderwaterFogColor(worldDir, st);
-        color = mix(color, uwCol, clamp(uwFog, 0.0, 0.94));
+        float clarityInv = 1.0 / max(WATER_CLARITY, 0.4);
+        // Physical Beer-Lambert spectral absorption along the water travel path + smooth scatter veil
+        vec3 uwAbsorb = exp(-viewDist * clarityInv * vec3(0.036, 0.020, 0.010));
+        float uwFog   = clamp(1.0 - exp(-viewDist * 0.024 * clarityInv), 0.0, 0.94);
+        vec3 uwCol    = computeUnderwaterFogColor(worldDir, st);
+        color = color * uwAbsorb * (1.0 - uwFog) + uwCol * uwFog;
         return applyStatusFog(color, viewDist, blindnessVal, darknessVal);
     } else if (eyeInWater == 2) {
         float lavaFog = 1.0 - exp(-viewDist * 0.45);

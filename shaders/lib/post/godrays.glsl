@@ -73,11 +73,20 @@ vec3 computeAnimeGodrays(
     float radialDist = length((uv - lightUV) * aspectCorr);
     float radialAtten = exp(-radialDist * 1.45) * 0.85 + exp(-radialDist * 0.55) * 0.35;
 
-    // Boost underwater shafts slightly for magical sunken-temple light beams!
-    float mediumBoost = (eyeInWater == 1) ? 1.45 : 1.0;
+    // Filter underwater light shafts into soft cool cerulean-blue sunbeams (never blinding yellow glare)
+    vec3 rayColor = st.godrayColor;
+    float mediumScale = 1.0;
+    if (eyeInWater == 1) {
+        float rayLuma = luma(st.godrayColor);
+        vec3 uwRayCol = mix(vec3(0.24, 0.44, 0.95), vec3(0.36, 0.58, 1.06), st.dayFactor);
+        rayColor = mix(st.godrayColor * vec3(0.28, 0.50, 0.96), uwRayCol * max(rayLuma, 0.35), 0.58);
+        mediumScale = 0.62;
+    } else if (eyeInWater >= 2) {
+        return vec3(0.0);
+    }
     float timeStrength = mix(0.42, 0.72 + 0.55 * st.sunsetFactor, st.dayFactor);
 
-    vec3 rays = st.godrayColor * accum * radialAtten * baseVis * timeStrength * GODRAYS_STRENGTH * mediumBoost * 0.72;
+    vec3 rays = rayColor * accum * radialAtten * baseVis * timeStrength * GODRAYS_STRENGTH * mediumScale * 0.72;
 
     // --- Delicate Anime Sun / Moon Halo Lens Flare & Pastel Bokeh Rings ---
 #ifdef SUN_LENS_FLARE
