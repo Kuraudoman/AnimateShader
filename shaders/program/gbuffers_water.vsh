@@ -37,12 +37,18 @@ void main() {
     vec3 viewNormal  = safeNormalize(gl_NormalMatrix * gl_Normal);
     vec3 worldNormal = safeNormalize((gbufferModelViewInverse * vec4(viewNormal, 0.0)).xyz);
 
-    // Subtle animated surface wave motion on horizontal water faces
-    if (vBlockId == 10001 && abs(worldNormal.y) > 0.5) {
-        float waveY = computeWaterVertexWave(worldPos, frameTimeCounter);
-        playerPos.y += waveY;
-        worldPos.y  += waveY;
-        viewPos = gbufferModelView * vec4(playerPos, 1.0);
+    // Subtle animated surface wave motion using position-only mask so top and side water faces
+    // sharing a vertex move identically (prevents black hairline cracks & corner pinholes on waterfalls)
+    if (vBlockId == 10001) {
+        float fy = fract(worldPos.y);
+        float distFromInt = min(fy, 1.0 - fy);
+        float surfaceMask = smoothstep(0.02, 0.06, distFromInt) * clamp(fy * 1.15, 0.0, 1.0);
+        if (surfaceMask > 0.001) {
+            float waveY = computeWaterVertexWave(worldPos, frameTimeCounter) * surfaceMask;
+            playerPos.y += waveY;
+            worldPos.y  += waveY;
+            viewPos = gbufferModelView * vec4(playerPos, 1.0);
+        }
     }
 
     vViewPos     = viewPos.xyz;

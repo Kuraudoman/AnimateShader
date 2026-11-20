@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SHADERS_DIR = ROOT / "shaders"
-OUT_ZIP = ROOT / "dist" / "AnimateShader-v1.0.3-mc26.3.zip"
+OUT_ZIP = ROOT / "dist" / "AnimateShader-v1.0.4-mc26.3.zip"
 
 
 def main():

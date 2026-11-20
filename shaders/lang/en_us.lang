@@ -28,7 +28,7 @@ value.ANIME_SHADING_STYLE.1=Soft Anime Cel
 value.ANIME_SHADING_STYLE.2=Crisp Anime Cel
 
 option.RIM_LIGHT_STRENGTH=Anime Rim Highlight
-option.RIM_LIGHT_STRENGTH.comment=Adds luminous golden sun-rim and silver-cyan moon-rim highlights to edges and entities.
+option.RIM_LIGHT_STRENGTH.comment=Adds subtle backlit golden sun-rim and silver-cyan moon-rim highlights to sunlit entities and foliage.
 
 option.BLOCKLIGHT_STRENGTH=Block Light Strength
 option.BLOCKLIGHT_STRENGTH.comment=Adjusts illumination from torches, lanterns, soul lights, sea lanterns, and emissive blocks.

@@ -219,11 +219,14 @@ void main() {
 
     // Sparkling underwater caustics when the player is submerged
     if (isEyeInWater == 1 && !isHand && !isUnlit) {
-        float caust = computeUnderwaterCaustics(worldPos, st.activeLightDir, frameTimeCounter);
-        float upFace = clamp(worldNormal.y * 0.7 + 0.3, 0.0, 1.0);
-        float caustFade = exp(-viewDist * 0.032) * smoothstep(0.15, 0.85, lightmap.y);
-        vec3 caustCol = mix(vec3(0.32, 0.86, 1.15), vec3(0.55, 1.08, 1.22), st.dayFactor);
-        litColor += albedoLinear * caustCol * caust * upFace * caustFade * luma(shadowTrans) * 0.75;
+        float upFace = smoothstep(0.45, 0.85, worldNormal.y);
+        float caustSunVis = smoothstep(0.04, 0.25, st.activeLightDir.y) * (1.0 - st.rainMix * 0.85);
+        if (upFace > 0.005 && caustSunVis > 0.005) {
+            float caust = computeUnderwaterCaustics(worldPos, st.activeLightDir, frameTimeCounter);
+            float caustFade = exp(-viewDist * 0.032) * smoothstep(0.15, 0.85, lightmap.y) * caustSunVis;
+            vec3 caustCol = mix(vec3(0.32, 0.86, 1.15), vec3(0.55, 1.08, 1.22), st.dayFactor);
+            litColor += albedoLinear * caustCol * caust * upFace * caustFade * luma(shadowTrans) * 0.70;
+        }
     }
 
     // Add glowing enchantment glint, mob eyes, and beacon energy from colortex3

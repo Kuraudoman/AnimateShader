@@ -219,38 +219,43 @@ vec3 shadeAnimeSurface(
     // --- 4. Block Light (Torches, Lanterns, Soul Lights) + Dynamic Held Light ---
     vec3 blockAndHand = computeBlockAndHandLight(blockLight, viewDist, viewNormal, viewDir, heldLightMain, heldLightOff);
 
-    // --- 5. Anime Rim Highlight (Backlit Golden/Moonlit Silhouette Edge!) ---
+    // --- 5. Anime Rim Highlight (Backlit Golden/Moonlit Silhouette Edge on Entities & Foliage Only!) ---
+    // Flat terrain/block faces must never receive grazing Fresnel rim light, otherwise
+    // matte blocks (dirt, grass, stone) show an artificial white specular-like sheen at oblique angles.
     vec3 rimLight = vec3(0.0);
-    if (RIM_LIGHT_STRENGTH > 0.001) {
-        float fresnel = pow(1.0 - max(dot(viewNormal, -viewDir), 0.0), 3.6);
-        float lightSide = smoothstep(-0.35, 0.75, dot(worldViewDir, st.activeLightDir) * 0.5 + 0.5);
-        float rimScale = (isEntity ? 0.52 : (isFoliage ? 0.34 : 0.22)) * RIM_LIGHT_STRENGTH;
-        rimLight = st.rimColor * fresnel * lightSide * rimScale * (0.28 + 0.72 * indoorMask) * (0.35 + 0.65 * luma(effectiveShadow));
+    if (RIM_LIGHT_STRENGTH > 0.001 && (isEntity || isFoliage)) {
+        float fresnel = pow(1.0 - max(dot(viewNormal, -viewDir), 0.0), 4.8);
+        // True backlit alignment: only illuminates silhouettes when looking toward the sun/moon
+        float backLit = smoothstep(0.15, 0.85, dot(worldViewDir, st.activeLightDir));
+        float directVis = luma(effectiveShadow) * indoorMask * smoothstep(0.0, 0.14, st.activeLightDir.y);
+        float rimScale = (isEntity ? 0.36 : 0.18) * RIM_LIGHT_STRENGTH;
+        vec3 rimTint = mix(albedoLinear, vec3(0.5) + albedoLinear * 0.5, isEntity ? 0.45 : 0.15);
+        rimLight = st.rimColor * rimTint * fresnel * backLit * rimScale * directVis;
     }
 
-    // --- 6. Glossy Anime Specular (Gems, Metals, Polished Blocks & Rain-Wet Surfaces) ---
+    // --- 6. Glossy Anime Specular (Gems, Metals, Polished Blocks & Rain-Wet Puddles) ---
     vec3 specLight = vec3(0.0);
     float rainPuddle = 0.0;
 #ifdef WET_REFLECTIONS
     if (wetnessVal > 0.01 && skyLight > 0.75 && !isFoliage && !isHand) {
-        float upSurface = smoothstep(0.55, 0.92, worldNormal.y);
-        float puddleNoise = smoothstep(0.32, 0.68, fbm2D(worldPos.xz * 0.22));
-        rainPuddle = wetnessVal * upSurface * (0.35 + 0.65 * puddleNoise);
+        float upSurface = smoothstep(0.65, 0.95, worldNormal.y);
+        float puddleNoise = smoothstep(0.38, 0.72, fbm2D(worldPos.xz * 0.22));
+        rainPuddle = wetnessVal * upSurface * puddleNoise;
     }
 #endif
 
-    float gloss = isPolished ? 0.78 : (isEntity ? 0.20 : 0.0);
-    gloss = max(gloss, rainPuddle * 0.85);
+    float gloss = isPolished ? 0.72 : (isEntity ? 0.18 : 0.0);
+    gloss = max(gloss, rainPuddle * 0.80);
     if (gloss > 0.05) {
         vec3 H = safeNormalize(st.activeLightDir - worldViewDir);
         float NdotH = max(dot(worldNormal, H), 0.0);
-        float specPow = mix(24.0, 96.0, gloss);
-        float spec = pow(NdotH, specPow) * gloss * 0.95;
+        float specPow = mix(28.0, 96.0, gloss);
+        float spec = pow(NdotH, specPow) * gloss * 0.72;
         specLight += st.directColor * spec * effectiveShadow * indoorMask;
 
         if (rainPuddle > 0.02) {
-            float wetFresnel = pow(1.0 - max(dot(viewNormal, -viewDir), 0.0), 4.0);
-            specLight += st.skyHorizon * wetFresnel * rainPuddle * 0.45;
+            float wetFresnel = pow(1.0 - max(dot(viewNormal, -viewDir), 0.0), 5.0);
+            specLight += st.skyHorizon * wetFresnel * rainPuddle * 0.24 * skyFactor;
         }
     }
 

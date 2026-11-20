@@ -62,8 +62,8 @@ const float shadowDistanceRenderMul = 1.0;
 const float entityShadowDistanceMul = 0.75;
 const float sunPathRotation = -32.0;
 const float ambientOcclusionLevel = 0.72;
-const float wetnessHalflife = 100.0;
-const float drynessHalflife = 200.0;
+const float wetnessHalflife = 35.0;
+const float drynessHalflife = 45.0;
 const float eyeBrightnessHalflife = 4.0;
 const float centerDepthHalflife = 1.5;
 

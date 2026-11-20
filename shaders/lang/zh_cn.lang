@@ -28,7 +28,7 @@ value.ANIME_SHADING_STYLE.1=动漫柔阶
 value.ANIME_SHADING_STYLE.2=鲜明赛璐璐
 
 option.RIM_LIGHT_STRENGTH=二次元轮廓高光
-option.RIM_LIGHT_STRENGTH.comment=为方块边缘与生物轮廓增加动漫逆光金边/月光银边高光。
+option.RIM_LIGHT_STRENGTH.comment=为逆光受照的生物与植被轮廓增加柔和的动漫金边/月光银边高光。
 
 option.BLOCKLIGHT_STRENGTH=火把与方块光强
 option.BLOCKLIGHT_STRENGTH.comment=调节火把、灯笼、灵魂灯、海晶灯等人工光源的照明亮度。

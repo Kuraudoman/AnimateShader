@@ -41,25 +41,42 @@ float waterWaveHeight(vec2 xz, float timeSec, float rainAmount) {
     return h;
 }
 
-// Compute perturbed world-space water normal with distance anti-aliasing
+// Compute perturbed world-space water normal with distance anti-aliasing.
+// Horizontal/top water uses multi-octave XZ swells; vertical waterfall faces use
+// tangent-plane flowing ripples without artificially tilting toward the sky!
 vec3 computeWaterWorldNormal(vec3 worldPos, vec3 baseWorldNormal, float viewDist, float timeSec, float rainAmount) {
     float upWeight = smoothstep(0.25, 0.85, abs(baseWorldNormal.y));
     float eps = 0.11;
+    // Distance attenuation prevents sub-pixel aliasing and shattered reflections far away
+    float distAtten = 1.0 / (1.0 + viewDist * 0.028);
 
     float hL = waterWaveHeight(worldPos.xz - vec2(eps, 0.0), timeSec, rainAmount);
     float hR = waterWaveHeight(worldPos.xz + vec2(eps, 0.0), timeSec, rainAmount);
     float hD = waterWaveHeight(worldPos.xz - vec2(0.0, eps), timeSec, rainAmount);
     float hU = waterWaveHeight(worldPos.xz + vec2(0.0, eps), timeSec, rainAmount);
 
-    // Distance attenuation prevents sub-pixel aliasing and shattered reflections far away
-    float distAtten = 1.0 / (1.0 + viewDist * 0.028);
-    float slopeScale = mix(0.25, 0.72, upWeight) * distAtten;
-    vec3 rippleNormal = normalize(vec3((hL - hR) * slopeScale, 2.0 * eps, (hD - hU) * slopeScale));
-
+    float slopeScale = 0.72 * distAtten;
+    vec3 horizNormal = normalize(vec3((hL - hR) * slopeScale, 2.0 * eps, (hD - hU) * slopeScale));
     if (baseWorldNormal.y < 0.0) {
-        rippleNormal.y = -rippleNormal.y;
+        horizNormal.y = -horizNormal.y;
     }
-    return safeNormalize(mix(baseWorldNormal, rippleNormal, 0.30 + 0.70 * upWeight));
+
+    if (upWeight >= 0.999) {
+        return horizNormal;
+    }
+
+    // Vertical / falling water faces: subtle flowing ripples strictly in the vertical tangent plane
+    vec3 tangentH = safeNormalize(vec3(-baseWorldNormal.z, 0.0, baseWorldNormal.x));
+    vec3 tangentV = vec3(0.0, 1.0, 0.0);
+    vec2 flowUV = vec2(dot(worldPos, tangentH) * 1.15, worldPos.y * 0.85 + timeSec * 2.4);
+    float fL = valueNoise2D(flowUV - vec2(eps, 0.0)) + 0.45 * valueNoise2D(flowUV * 2.1 - vec2(eps, 0.0));
+    float fR = valueNoise2D(flowUV + vec2(eps, 0.0)) + 0.45 * valueNoise2D(flowUV * 2.1 + vec2(eps, 0.0));
+    float fD = valueNoise2D(flowUV - vec2(0.0, eps)) + 0.45 * valueNoise2D(flowUV * 2.1 - vec2(0.0, eps));
+    float fU = valueNoise2D(flowUV + vec2(0.0, eps)) + 0.45 * valueNoise2D(flowUV * 2.1 + vec2(0.0, eps));
+    float vScale = 0.08 * distAtten;
+    vec3 vertNormal = safeNormalize(baseWorldNormal + tangentH * ((fL - fR) * vScale) + tangentV * ((fD - fU) * vScale));
+
+    return safeNormalize(mix(vertNormal, horizNormal, upWeight));
 }
 
 #endif

@@ -24,16 +24,17 @@ float causticLayer(vec2 p, float t) {
         }
     }
     // Crisp luminous cell ridges
-    return pow(clamp(minDist, 0.0, 1.0), 3.2);
+    return pow(clamp(minDist, 0.0, 1.0), 3.5);
 }
 
 float computeUnderwaterCaustics(vec3 worldPos, vec3 lightDir, float timeSec) {
 #ifdef WATER_CAUSTICS
     // Project world coordinate along the incoming light ray onto horizontal wave plane
-    vec2 proj = worldPos.xz - lightDir.xz * (worldPos.y / max(abs(lightDir.y), 0.35));
+    // Clamp vertical divisor to avoid stretching Voronoi cells into harsh stripes at low angles
+    vec2 proj = worldPos.xz - lightDir.xz * (worldPos.y / max(abs(lightDir.y), 0.55));
     float c1 = causticLayer(proj * 0.58 + vec2(timeSec * 0.14, timeSec * 0.09), timeSec * 1.45);
     float c2 = causticLayer(proj * 0.86 - vec2(timeSec * 0.11, -timeSec * 0.15), timeSec * 1.15 + 2.1);
-    return clamp((c1 + c2) * 1.55, 0.0, 1.6);
+    return clamp((c1 + c2) * 1.45, 0.0, 1.35);
 #else
     return 0.0;
 #endif
